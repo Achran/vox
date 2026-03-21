@@ -482,3 +482,10 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Frontend libraries (managed separately)
+src/Clients/Vox.Web/wwwroot/lib/
+
+# Shared UI template files
+src/Clients/Vox.Shared.UI/wwwroot/background.png
+src/Clients/Vox.Shared.UI/wwwroot/exampleJsInterop.js
