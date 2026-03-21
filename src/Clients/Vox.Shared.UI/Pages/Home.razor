@@ -1,0 +1,29 @@
+@page "/"
+
+<MudText Typo="Typo.h4" GutterBottom="true">Welcome to Vox</MudText>
+<MudText Typo="Typo.body1">
+    Vox is a voice communication application. Select a server or channel from the menu to get started.
+</MudText>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.Forum" Class="mr-2" />
+                        Servers
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText>Browse and join voice servers.</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/servers">
+                    Browse Servers
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
