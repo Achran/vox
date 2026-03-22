@@ -1,0 +1,28 @@
+name: Setup project structure (milestones, sub-issues, dependencies)
+
+on:
+  # Run automatically once when this workflow file is first pushed to the branch
+  push:
+    branches:
+      - 'copilot/setup-sub-issues-dependencies-milestones'
+    paths:
+      - '.github/workflows/setup-project-structure.yml'
+  # Also allow manual re-runs from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  setup:
+    name: Create milestones, sub-issues and dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run setup script
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 .github/scripts/setup_project.py
