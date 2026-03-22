@@ -72,7 +72,6 @@ public class ServerMemberTests
         var originalUpdatedAt = member.UpdatedAt;
 
         // Act
-        Thread.Sleep(10); // Ensure time difference
         member.UpdateRole(ServerRole.Admin);
 
         // Assert
