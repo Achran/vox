@@ -116,6 +116,86 @@ public sealed class IdentityService : IIdentityService
         }
     }
 
+    public async Task<AuthTokensDto> ExternalLoginAsync(
+        string provider,
+        string providerKey,
+        string? email,
+        string? displayName,
+        CancellationToken cancellationToken = default)
+    {
+        // Try to find an existing user linked to this external login
+        var appUser = await _userManager.FindByLoginAsync(provider, providerKey);
+
+        if (appUser is not null)
+        {
+            var tokens = await GenerateAndStoreTokensAsync(appUser, cancellationToken);
+            return BuildDto(appUser, tokens);
+        }
+
+        // No existing external login link — check if there's a user with matching email
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+        if (email is not null)
+        {
+            appUser = await _userManager.FindByEmailAsync(email);
+        }
+
+        if (appUser is null)
+        {
+            // Create a brand new user
+            var userName = GenerateUniqueUserName(provider, providerKey);
+            var userEmail = email ?? $"{userName}@external.vox";
+            var userDisplayName = displayName ?? userName;
+
+            var domainUser = User.Create(userName, userEmail, userDisplayName);
+
+            appUser = new ApplicationUser
+            {
+                UserName = userName,
+                Email = userEmail,
+                DisplayName = userDisplayName,
+                DomainUserId = domainUser.Id,
+                CreatedAt = DateTime.UtcNow,
+                EmailConfirmed = email is not null
+            };
+
+            var createResult = await _userManager.CreateAsync(appUser);
+            if (!createResult.Succeeded)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                var errors = createResult.Errors.Select(e => e.Description).ToArray();
+                throw new InvalidOperationException(string.Join("; ", errors));
+            }
+
+            _context.DomainUsers.Add(domainUser);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        // Link the external login to the user
+        var loginResult = await _userManager.AddLoginAsync(appUser,
+            new UserLoginInfo(provider, providerKey, provider));
+        if (!loginResult.Succeeded)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            var errors = loginResult.Errors.Select(e => e.Description).ToArray();
+            throw new InvalidOperationException(string.Join("; ", errors));
+        }
+
+        var authTokens = await GenerateAndStoreTokensAsync(appUser, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return BuildDto(appUser, authTokens);
+    }
+
+    private static string GenerateUniqueUserName(string provider, string providerKey)
+    {
+        // Produce a short deterministic username: provider_first8charsOfHash
+        var hash = Convert.ToHexStringLower(
+            System.Security.Cryptography.SHA256.HashData(
+                Encoding.UTF8.GetBytes($"{provider}:{providerKey}")));
+        return $"{provider.ToLowerInvariant()}_{hash[..8]}";
+    }
+
     private async Task<(string AccessToken, string RefreshToken, DateTime ExpiresAt)> GenerateAndStoreTokensAsync(
         ApplicationUser user,
         CancellationToken cancellationToken)

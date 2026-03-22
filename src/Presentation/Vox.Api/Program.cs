@@ -41,6 +41,7 @@ app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Timestamp = Dat
    .WithTags("Health");
 
 app.MapAuthEndpoints();
+app.MapExternalAuthEndpoints();
 
 app.Run();
 

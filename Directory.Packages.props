@@ -3,7 +3,11 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup Label="ASP.NET Core / EF Core / Identity">
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.Facebook" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.Google" Version="9.0.5" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.Twitter" Version="9.0.5" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="9.0.5" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.5" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.5" />
@@ -25,6 +29,10 @@
     <PackageVersion Include="MediatR" Version="12.5.0" />
     <PackageVersion Include="FluentValidation" Version="11.11.0" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+  </ItemGroup>
+  <ItemGroup Label="External OAuth / OpenID">
+    <PackageVersion Include="AspNet.Security.OAuth.GitHub" Version="9.4.1" />
+    <PackageVersion Include="AspNet.Security.OpenId.Steam" Version="9.0.0" />
   </ItemGroup>
   <ItemGroup Label="MudBlazor">
     <PackageVersion Include="MudBlazor" Version="8.6.0" />
