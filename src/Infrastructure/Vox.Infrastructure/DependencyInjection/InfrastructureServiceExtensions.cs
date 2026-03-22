@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -106,7 +107,7 @@ public static class InfrastructureServiceExtensions
     }
 
     private static void AddExternalProviders(
-        Microsoft.AspNetCore.Authentication.AuthenticationBuilder authBuilder,
+        AuthenticationBuilder authBuilder,
         IConfigurationSection externalSection)
     {
         var google = externalSection.GetSection("Google");

@@ -99,9 +99,10 @@ public static class ExternalAuthEndpoints
         string refreshToken,
         DateTime expiresAt)
     {
+        var expiresAtEpoch = new DateTimeOffset(expiresAt, TimeSpan.Zero).ToUnixTimeSeconds();
         var separator = baseUrl.Contains('?') ? '&' : '?';
         return $"{baseUrl}{separator}access_token={Uri.EscapeDataString(accessToken)}" +
                $"&refresh_token={Uri.EscapeDataString(refreshToken)}" +
-               $"&expires_at={Uri.EscapeDataString(expiresAt.ToString("O"))}";
+               $"&expires_at={expiresAtEpoch}";
     }
 }
