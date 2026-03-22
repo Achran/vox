@@ -1,3 +1,4 @@
+using Vox.Api.Endpoints;
 using Vox.Application.DependencyInjection;
 using Vox.Infrastructure.DependencyInjection;
 using Vox.Infrastructure.Hubs;
@@ -8,7 +9,6 @@ builder.Services.AddOpenApi();
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
-builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 
 builder.Services.AddCors(options =>
@@ -39,6 +39,8 @@ app.MapHub<ChatHub>("/hubs/chat");
 app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Timestamp = DateTime.UtcNow }))
    .WithName("HealthCheck")
    .WithTags("Health");
+
+app.MapAuthEndpoints();
 
 app.Run();
 

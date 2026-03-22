@@ -17,6 +17,7 @@ public class VoxDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Channel> Channels => Set<Channel>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<ServerMember> ServerMembers => Set<ServerMember>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
