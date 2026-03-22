@@ -43,6 +43,12 @@ public static class InfrastructureServiceExtensions
         var secret = jwtSection["Secret"]
             ?? throw new InvalidOperationException("JwtSettings:Secret is not configured.");
 
+        if (secret.Length < 32)
+        {
+            throw new InvalidOperationException(
+                "JwtSettings:Secret must be at least 32 characters long (256 bits) for sufficient cryptographic strength.");
+        }
+
         services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

@@ -7,7 +7,7 @@ public sealed class RefreshToken
     public string UserId { get; set; } = string.Empty;
     public DateTime ExpiresAt { get; set; }
     public bool IsRevoked { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
     public ApplicationUser User { get; set; } = null!;
 }
