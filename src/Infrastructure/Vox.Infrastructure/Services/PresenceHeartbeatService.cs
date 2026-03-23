@@ -45,7 +45,7 @@ public sealed class PresenceHeartbeatService : BackgroundService
         }
     }
 
-    private async Task CleanupStaleConnectionsAsync()
+    internal async Task CleanupStaleConnectionsAsync()
     {
         var staleConnectionIds = _presenceService.GetStaleConnectionIds(StaleTimeout);
 

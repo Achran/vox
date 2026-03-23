@@ -343,4 +343,102 @@ public class PresenceServiceTests
         // Act & Assert
         Assert.True(_sut.IsConnectionStale("unknown", TimeSpan.FromSeconds(30)));
     }
+
+    [Fact]
+    public async Task UserConnectedAsync_ReturnsTrue_WhenFirstConnection()
+    {
+        // Act
+        var isFirst = await _sut.UserConnectedAsync("conn1", "user1");
+
+        // Assert
+        Assert.True(isFirst);
+    }
+
+    [Fact]
+    public async Task UserConnectedAsync_ReturnsFalse_WhenSubsequentConnection()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+
+        // Act
+        var isFirst = await _sut.UserConnectedAsync("conn2", "user1");
+
+        // Assert
+        Assert.False(isFirst);
+    }
+
+    [Fact]
+    public async Task UserDisconnectedAsync_ReturnsTrue_WhenLastConnection()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+
+        // Act
+        var isLast = await _sut.UserDisconnectedAsync("conn1");
+
+        // Assert
+        Assert.True(isLast);
+    }
+
+    [Fact]
+    public async Task UserDisconnectedAsync_ReturnsFalse_WhenOtherConnectionsRemain()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+        await _sut.UserConnectedAsync("conn2", "user1");
+
+        // Act
+        var isLast = await _sut.UserDisconnectedAsync("conn1");
+
+        // Assert
+        Assert.False(isLast);
+    }
+
+    [Fact]
+    public async Task HeartbeatAsync_KeepsConnectionFresh_AfterMultipleHeartbeats()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+
+        // Act - advance time and heartbeat repeatedly
+        _timeProvider.Advance(TimeSpan.FromSeconds(20));
+        await _sut.HeartbeatAsync("conn1");
+        _timeProvider.Advance(TimeSpan.FromSeconds(20));
+        await _sut.HeartbeatAsync("conn1");
+        _timeProvider.Advance(TimeSpan.FromSeconds(10));
+
+        // Assert - only 10s since last heartbeat, not stale with 30s timeout
+        Assert.False(_sut.IsConnectionStale("conn1", TimeSpan.FromSeconds(30)));
+    }
+
+    [Fact]
+    public async Task GetStaleConnectionIds_ReturnsMixedResults()
+    {
+        // Arrange - conn1 is stale, conn2 is fresh
+        await _sut.UserConnectedAsync("conn1", "user1");
+        _timeProvider.Advance(TimeSpan.FromSeconds(35));
+        await _sut.UserConnectedAsync("conn2", "user2");
+
+        // Act
+        var stale = _sut.GetStaleConnectionIds(TimeSpan.FromSeconds(30));
+
+        // Assert
+        Assert.Single(stale);
+        Assert.Contains("conn1", stale);
+        Assert.DoesNotContain("conn2", stale);
+    }
+
+    [Fact]
+    public async Task UserDisconnectedAsync_RemovesHeartbeatEntry()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+
+        // Act
+        await _sut.UserDisconnectedAsync("conn1");
+
+        // Assert - disconnected connection is unknown, not stale
+        Assert.True(_sut.IsConnectionStale("conn1", TimeSpan.FromSeconds(30)));
+        Assert.Empty(_sut.GetStaleConnectionIds(TimeSpan.FromSeconds(0)));
+    }
 }
