@@ -61,7 +61,7 @@ public class ChatHub : Hub
 
         await _presenceService.UserDisconnectedAsync(Context.ConnectionId);
 
-        if (userId is not null)
+        if (userId is not null && !_presenceService.IsUserOnline(userId))
         {
             foreach (var channelId in channels)
             {

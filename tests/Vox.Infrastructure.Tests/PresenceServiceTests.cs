@@ -221,4 +221,38 @@ public class PresenceServiceTests
         // Assert
         Assert.Null(userId);
     }
+
+    [Fact]
+    public async Task IsUserOnline_ReturnsTrue_WhenUserHasConnection()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+
+        // Act & Assert
+        Assert.True(_sut.IsUserOnline("user1"));
+    }
+
+    [Fact]
+    public async Task IsUserOnline_ReturnsFalse_AfterAllConnectionsDisconnected()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+        await _sut.UserConnectedAsync("conn2", "user1");
+
+        // Act
+        await _sut.UserDisconnectedAsync("conn1");
+        Assert.True(_sut.IsUserOnline("user1"));
+
+        await _sut.UserDisconnectedAsync("conn2");
+
+        // Assert
+        Assert.False(_sut.IsUserOnline("user1"));
+    }
+
+    [Fact]
+    public void IsUserOnline_ReturnsFalse_ForUnknownUser()
+    {
+        // Act & Assert
+        Assert.False(_sut.IsUserOnline("unknown"));
+    }
 }

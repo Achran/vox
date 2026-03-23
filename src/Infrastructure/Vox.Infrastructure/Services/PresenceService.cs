@@ -80,10 +80,7 @@ public sealed class PresenceService : IPresenceService
 
     public Task HeartbeatAsync(string connectionId)
     {
-        if (_connectionUserMap.ContainsKey(connectionId))
-        {
-            _heartbeatMap[connectionId] = DateTime.UtcNow;
-        }
+        _heartbeatMap.AddOrUpdate(connectionId, _ => DateTime.UtcNow, (_, _) => DateTime.UtcNow);
 
         return Task.CompletedTask;
     }
@@ -138,5 +135,10 @@ public sealed class PresenceService : IPresenceService
         }
 
         return [];
+    }
+
+    public bool IsUserOnline(string userId)
+    {
+        return _userConnectionMap.TryGetValue(userId, out var connections) && !connections.IsEmpty;
     }
 }

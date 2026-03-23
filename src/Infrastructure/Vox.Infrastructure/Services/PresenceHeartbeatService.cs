@@ -63,10 +63,13 @@ public sealed class PresenceHeartbeatService : BackgroundService
                     userId,
                     connectionId);
 
-                foreach (var channelId in channels)
+                if (!_presenceService.IsUserOnline(userId))
                 {
-                    await _hubContext.Clients.Group(channelId)
-                        .SendAsync("UserStatusChanged", userId, "Offline");
+                    foreach (var channelId in channels)
+                    {
+                        await _hubContext.Clients.Group(channelId)
+                            .SendAsync("UserStatusChanged", userId, "Offline");
+                    }
                 }
             }
         }

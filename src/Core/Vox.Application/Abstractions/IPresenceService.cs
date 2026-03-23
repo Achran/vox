@@ -12,4 +12,5 @@ public interface IPresenceService
     IReadOnlyList<string> GetStaleConnectionIds(TimeSpan timeout);
     string? GetUserIdByConnectionId(string connectionId);
     IReadOnlyList<string> GetChannelsByConnectionId(string connectionId);
+    bool IsUserOnline(string userId);
 }
