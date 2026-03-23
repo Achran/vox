@@ -123,7 +123,7 @@ public sealed class AuthService : IAuthService
         try
         {
             var accessToken = await _tokenStorage.GetAccessTokenAsync();
-            using var request = new HttpRequestMessage(HttpMethod.Get, "api/auth/account-links");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "api/auth/account-links/");
             if (!string.IsNullOrEmpty(accessToken))
                 request.Headers.Authorization =
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
