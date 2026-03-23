@@ -27,19 +27,22 @@ export async function connect(url, token, dotNetRef) {
         // Active-speaker changes
         _room.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, (speakers) => {
             const ids = speakers.map(p => p.identity);
-            _dotNetRef?.invokeMethodAsync("OnActiveSpeakersChanged", ids);
+            _dotNetRef?.invokeMethodAsync("OnActiveSpeakersChanged", ids)
+                .catch(e => console.warn("[voiceInterop] OnActiveSpeakersChanged callback failed:", e));
         });
 
         // Remote participant mute / unmute
         _room.on(LivekitClient.RoomEvent.TrackMuted, (publication, participant) => {
             if (publication.kind === "audio") {
-                _dotNetRef?.invokeMethodAsync("OnParticipantMuteChanged", participant.identity, true);
+                _dotNetRef?.invokeMethodAsync("OnParticipantMuteChanged", participant.identity, true)
+                    .catch(e => console.warn("[voiceInterop] OnParticipantMuteChanged callback failed:", e));
             }
         });
 
         _room.on(LivekitClient.RoomEvent.TrackUnmuted, (publication, participant) => {
             if (publication.kind === "audio") {
-                _dotNetRef?.invokeMethodAsync("OnParticipantMuteChanged", participant.identity, false);
+                _dotNetRef?.invokeMethodAsync("OnParticipantMuteChanged", participant.identity, false)
+                    .catch(e => console.warn("[voiceInterop] OnParticipantMuteChanged callback failed:", e));
             }
         });
 
@@ -57,7 +60,8 @@ export async function connect(url, token, dotNetRef) {
         });
 
         _room.on(LivekitClient.RoomEvent.Disconnected, () => {
-            _dotNetRef?.invokeMethodAsync("OnLiveKitDisconnected");
+            _dotNetRef?.invokeMethodAsync("OnLiveKitDisconnected")
+                .catch(e => console.warn("[voiceInterop] OnLiveKitDisconnected callback failed:", e));
         });
 
         await _room.connect(url, token);

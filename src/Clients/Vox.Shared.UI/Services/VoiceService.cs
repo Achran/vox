@@ -191,9 +191,15 @@ public sealed class VoiceService : IVoiceService
     public void ToggleMute()
     {
         IsMuted = !IsMuted;
-        _ = SetMicrophoneEnabledAsync(!IsMuted);
-        _ = BroadcastMuteStateAsync();
         StateChanged?.Invoke();
+
+        // Apply the audio change and broadcast mute state asynchronously.
+        // Both operations are best-effort: a failure does not roll back the local toggle.
+        _ = Task.Run(async () =>
+        {
+            await SetMicrophoneEnabledAsync(!IsMuted);
+            await BroadcastMuteStateAsync();
+        });
     }
 
     // ------------------------------------------------------------------
@@ -205,7 +211,7 @@ public sealed class VoiceService : IVoiceService
         try
         {
             var tokenResponse = await _http.GetFromJsonAsync<LiveKitTokenResponse>(
-                $"api/voice/token/{channelId}");
+                $"api/voice/token/{Uri.EscapeDataString(channelId)}");
 
             if (tokenResponse is null)
                 return;
