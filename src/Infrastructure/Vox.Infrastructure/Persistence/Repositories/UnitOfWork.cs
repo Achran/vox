@@ -10,6 +10,7 @@ public class UnitOfWork : IUnitOfWork
     public IServerRepository Servers { get; }
     public IChannelRepository Channels { get; }
     public IServerMemberRepository ServerMembers { get; }
+    public IMessageRepository Messages { get; }
 
     public UnitOfWork(VoxDbContext context)
     {
@@ -18,6 +19,7 @@ public class UnitOfWork : IUnitOfWork
         Servers = new ServerRepository(context);
         Channels = new ChannelRepository(context);
         ServerMembers = new ServerMemberRepository(context);
+        Messages = new MessageRepository(context);
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

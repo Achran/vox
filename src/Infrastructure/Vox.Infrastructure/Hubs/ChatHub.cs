@@ -1,17 +1,40 @@
+using MediatR;
 using Microsoft.AspNetCore.SignalR;
+using Vox.Application.Features.Messages.Commands.SendMessage;
 
 namespace Vox.Infrastructure.Hubs;
 
 public class ChatHub : Hub
 {
+    private readonly IMediator _mediator;
+
+    public ChatHub(IMediator mediator)
+    {
+        _mediator = mediator;
+    }
+
     public async Task SendMessage(string channelId, string message)
     {
+        var userIdClaim = Context.User?.FindFirst("domain_user_id")?.Value;
+        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var authorId))
+        {
+            throw new HubException("Unauthorized.");
+        }
+
+        if (!Guid.TryParse(channelId, out var channelGuid))
+        {
+            throw new HubException("Invalid channel ID.");
+        }
+
+        var result = await _mediator.Send(new SendMessageCommand(channelGuid, message, authorId));
+
         await Clients.Group(channelId).SendAsync("ReceiveMessage", new
         {
-            UserId = Context.UserIdentifier,
-            ChannelId = channelId,
-            Content = message,
-            Timestamp = DateTime.UtcNow
+            result.Id,
+            UserId = result.AuthorId,
+            result.ChannelId,
+            result.Content,
+            Timestamp = result.CreatedAt
         });
     }
 

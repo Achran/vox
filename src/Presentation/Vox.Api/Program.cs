@@ -1,3 +1,5 @@
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Vox.Api.Endpoints;
 using Vox.Application.DependencyInjection;
 using Vox.Infrastructure.DependencyInjection;
@@ -10,6 +12,19 @@ builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddFixedWindowLimiter("chat", limiter =>
+    {
+        limiter.PermitLimit = 10;
+        limiter.Window = TimeSpan.FromSeconds(10);
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit = 2;
+    });
+});
 
 builder.Services.AddCors(options =>
 {
@@ -33,6 +48,7 @@ app.UseHttpsRedirection();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapHub<ChatHub>("/hubs/chat");
 
@@ -45,6 +61,7 @@ app.MapExternalAuthEndpoints();
 app.MapAccountLinkEndpoints();
 app.MapServerEndpoints();
 app.MapChannelEndpoints();
+app.MapMessageEndpoints();
 
 app.Run();
 
