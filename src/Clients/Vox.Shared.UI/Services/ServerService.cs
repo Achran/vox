@@ -52,7 +52,7 @@ public sealed class ServerService : IServerService
         try
         {
             using var request = await CreateAuthorizedRequestAsync(HttpMethod.Get, $"api/servers/{id}");
-            var response = await _http.SendAsync(request);
+            using var response = await _http.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -76,7 +76,7 @@ public sealed class ServerService : IServerService
         {
             using var request = await CreateAuthorizedRequestAsync(HttpMethod.Post, "api/servers");
             request.Content = JsonContent.Create(new CreateServerRequest(name, description), options: JsonOptions);
-            var response = await _http.SendAsync(request);
+            using var response = await _http.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -100,7 +100,7 @@ public sealed class ServerService : IServerService
         {
             using var request = await CreateAuthorizedRequestAsync(HttpMethod.Put, $"api/servers/{id}");
             request.Content = JsonContent.Create(new UpdateServerRequest(name, description), options: JsonOptions);
-            var response = await _http.SendAsync(request);
+            using var response = await _http.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -123,7 +123,7 @@ public sealed class ServerService : IServerService
         try
         {
             using var request = await CreateAuthorizedRequestAsync(HttpMethod.Delete, $"api/servers/{id}");
-            var response = await _http.SendAsync(request);
+            using var response = await _http.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {

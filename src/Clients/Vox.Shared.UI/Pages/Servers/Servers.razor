@@ -14,8 +14,7 @@
                    OnServerSelected="OnServerSelected"
                    OnServersChanged="OnServersChangedAsync" />
 
-    <ChannelList @ref="_channelList"
-                 Server="@_selectedServer"
+    <ChannelList Server="@_selectedServer"
                  SelectedChannelId="@_selectedChannel?.Id"
                  OnChannelSelected="OnChannelSelected"
                  OnChannelsChanged="StateHasChanged"
@@ -82,7 +81,6 @@
     public Guid? ChannelId { get; set; }
 
     private ServerSidebar _serverSidebar = null!;
-    private ChannelList _channelList = null!;
     private ServerResponse? _selectedServer;
     private ChannelResponse? _selectedChannel;
 
@@ -117,7 +115,7 @@
         else if (_selectedChannel is null || _selectedChannel.Id != ChannelId.Value)
         {
             var channel = await ChannelService.GetChannelByIdAsync(ChannelId.Value);
-            _selectedChannel = channel;
+            _selectedChannel = channel?.ServerId == _selectedServer!.Id ? channel : null;
         }
     }
 

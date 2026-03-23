@@ -30,7 +30,7 @@ public sealed class ChannelService : IChannelService
         {
             using var request = await CreateAuthorizedRequestAsync(
                 HttpMethod.Get, $"api/servers/{serverId}/channels");
-            var response = await _http.SendAsync(request);
+            using var response = await _http.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -53,7 +53,7 @@ public sealed class ChannelService : IChannelService
         try
         {
             using var request = await CreateAuthorizedRequestAsync(HttpMethod.Get, $"api/channels/{id}");
-            var response = await _http.SendAsync(request);
+            using var response = await _http.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -78,7 +78,7 @@ public sealed class ChannelService : IChannelService
             using var request = await CreateAuthorizedRequestAsync(
                 HttpMethod.Post, $"api/servers/{serverId}/channels");
             request.Content = JsonContent.Create(new CreateChannelRequest(name, type), options: JsonOptions);
-            var response = await _http.SendAsync(request);
+            using var response = await _http.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -102,7 +102,7 @@ public sealed class ChannelService : IChannelService
         {
             using var request = await CreateAuthorizedRequestAsync(HttpMethod.Put, $"api/channels/{id}");
             request.Content = JsonContent.Create(new UpdateChannelRequest(name), options: JsonOptions);
-            var response = await _http.SendAsync(request);
+            using var response = await _http.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -125,7 +125,7 @@ public sealed class ChannelService : IChannelService
         try
         {
             using var request = await CreateAuthorizedRequestAsync(HttpMethod.Delete, $"api/channels/{id}");
-            var response = await _http.SendAsync(request);
+            using var response = await _http.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
