@@ -43,16 +43,17 @@ else
 
     private void CleanupExpiredTyping()
     {
-        var expired = _typingUsers
-            .Where(kvp => (DateTime.UtcNow - kvp.Value).TotalSeconds > 5)
-            .Select(kvp => kvp.Key)
-            .ToList();
-
-        if (!expired.Any())
-            return;
-
         InvokeAsync(() =>
         {
+            var now = DateTime.UtcNow;
+            var expired = _typingUsers
+                .Where(kvp => (now - kvp.Value).TotalSeconds > 5)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            if (!expired.Any())
+                return;
+
             foreach (var key in expired)
                 _typingUsers.Remove(key);
             StateHasChanged();

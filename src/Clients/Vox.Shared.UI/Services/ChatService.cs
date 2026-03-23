@@ -8,6 +8,7 @@ public sealed class ChatService : IChatService
     private readonly ITokenStorageService _tokenStorage;
     private readonly Uri _hubUrl;
     private HubConnection? _hubConnection;
+    private readonly HashSet<string> _joinedChannels = new();
 
     public event Action<MessageResponse>? MessageReceived;
     public event Action<string, string>? UserTyping;
@@ -17,14 +18,27 @@ public sealed class ChatService : IChatService
     public ChatService(HttpClient http, ITokenStorageService tokenStorage)
     {
         _tokenStorage = tokenStorage;
-        var baseUri = http.BaseAddress ?? new Uri("https://localhost");
-        _hubUrl = new Uri(baseUri, "hubs/chat");
+
+        if (http.BaseAddress is null)
+        {
+            throw new InvalidOperationException(
+                "HttpClient.BaseAddress must be configured before creating ChatService.");
+        }
+
+        _hubUrl = new Uri(http.BaseAddress, "hubs/chat");
     }
 
     public async Task ConnectAsync()
     {
         if (_hubConnection is not null && _hubConnection.State != HubConnectionState.Disconnected)
             return;
+
+        // Dispose the previous connection if it exists (e.g. after a failed StartAsync)
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+            _hubConnection = null;
+        }
 
         _hubConnection = new HubConnectionBuilder()
             .WithUrl(_hubUrl, options =>
@@ -44,11 +58,21 @@ public sealed class ChatService : IChatService
             UserTyping?.Invoke(userId, channelId);
         });
 
+        _hubConnection.Reconnected += async _ =>
+        {
+            // Rejoin all tracked channels after reconnect
+            foreach (var channelId in _joinedChannels)
+            {
+                await _hubConnection.InvokeAsync("JoinChannel", channelId);
+            }
+        };
+
         await _hubConnection.StartAsync();
     }
 
     public async Task JoinChannelAsync(string channelId)
     {
+        _joinedChannels.Add(channelId);
         if (IsConnected)
         {
             await _hubConnection!.InvokeAsync("JoinChannel", channelId);
@@ -57,6 +81,7 @@ public sealed class ChatService : IChatService
 
     public async Task LeaveChannelAsync(string channelId)
     {
+        _joinedChannels.Remove(channelId);
         if (IsConnected)
         {
             await _hubConnection!.InvokeAsync("LeaveChannel", channelId);

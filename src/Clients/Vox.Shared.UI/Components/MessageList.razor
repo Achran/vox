@@ -4,7 +4,6 @@
 @implements IAsyncDisposable
 
 <div @ref="_containerRef"
-     data-chat-scroll
      class="d-flex flex-column"
      style="flex: 1; overflow-y: auto; padding: 16px;"
      @onscroll="OnScrollAsync">
@@ -62,8 +61,6 @@
 </div>
 
 @code {
-    private const string ChatScrollSelector = "[data-chat-scroll]";
-
     [Parameter, EditorRequired]
     public Guid ChannelId { get; set; }
 
@@ -122,6 +119,11 @@
         _loadingOlder = true;
         StateHasChanged();
 
+        // Capture scroll state before inserting older messages
+        var module = await GetJsModuleAsync();
+        var previousScrollHeight = await module.InvokeAsync<double>("getScrollHeight", _containerRef);
+        var previousScrollTop = await module.InvokeAsync<double>("getScrollTop", _containerRef);
+
         var oldest = _messages.First().CreatedAt;
         var olderMessages = await MessageService.GetChannelMessagesAsync(ChannelId, PageSize, oldest);
 
@@ -135,6 +137,15 @@
 
         _loadingOlder = false;
         StateHasChanged();
+
+        // Restore scroll position so the user stays anchored on the same message
+        if (olderMessages.Any())
+        {
+            await Task.Yield();
+            var newScrollHeight = await module.InvokeAsync<double>("getScrollHeight", _containerRef);
+            var scrollDelta = newScrollHeight - previousScrollHeight;
+            await module.InvokeVoidAsync("setScrollTop", _containerRef, previousScrollTop + scrollDelta);
+        }
     }
 
     private async Task OnScrollAsync()
@@ -142,7 +153,7 @@
         try
         {
             var module = await GetJsModuleAsync();
-            var scrollTop = await module.InvokeAsync<double>("getScrollTop", ChatScrollSelector);
+            var scrollTop = await module.InvokeAsync<double>("getScrollTop", _containerRef);
             if (scrollTop >= 0 && scrollTop < 50)
             {
                 await LoadOlderMessagesAsync();
@@ -173,7 +184,7 @@
         {
             await Task.Yield();
             var module = await GetJsModuleAsync();
-            await module.InvokeVoidAsync("scrollToBottom", ChatScrollSelector);
+            await module.InvokeVoidAsync("scrollToBottom", _containerRef);
         }
         catch
         {

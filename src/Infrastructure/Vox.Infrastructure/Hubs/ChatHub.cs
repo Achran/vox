@@ -30,10 +30,11 @@ public class ChatHub : Hub
         await Clients.Group(channelId).SendAsync("ReceiveMessage", new
         {
             result.Id,
-            UserId = result.AuthorId,
+            result.AuthorId,
             result.ChannelId,
             result.Content,
-            Timestamp = result.CreatedAt
+            result.IsEdited,
+            result.CreatedAt
         });
     }
 
