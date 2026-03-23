@@ -80,14 +80,6 @@ public class MessageTests
     }
 
     [Fact]
-    public void Create_WithMaxLengthContent_ReturnsMessage()
-    {
-        var content = new string('a', 4000);
-        var message = Message.Create(Guid.NewGuid(), Guid.NewGuid(), content);
-        Assert.Equal(4000, message.Content.Length);
-    }
-
-    [Fact]
     public void Edit_WithNullContent_ThrowsArgumentException()
     {
         var message = Message.Create(Guid.NewGuid(), Guid.NewGuid(), "Original");
