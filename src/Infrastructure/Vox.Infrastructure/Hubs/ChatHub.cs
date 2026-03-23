@@ -30,10 +30,11 @@ public class ChatHub : Hub
         await Clients.Group(channelId).SendAsync("ReceiveMessage", new
         {
             result.Id,
-            UserId = result.AuthorId,
+            result.AuthorId,
             result.ChannelId,
             result.Content,
-            Timestamp = result.CreatedAt
+            result.IsEdited,
+            result.CreatedAt
         });
     }
 
@@ -68,6 +69,12 @@ public class ChatHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, channelId);
         await _presenceService.UserLeftChannelAsync(Context.ConnectionId, channelId);
         await Clients.Group(channelId).SendAsync("UserLeft", Context.UserIdentifier, channelId);
+    }
+
+    public async Task StartTyping(string channelId)
+    {
+        var userId = GetDomainUserId();
+        await Clients.OthersInGroup(channelId).SendAsync("UserTyping", userId.ToString(), channelId);
     }
 
     public async Task Heartbeat()

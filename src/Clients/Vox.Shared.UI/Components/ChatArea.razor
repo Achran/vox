@@ -1,0 +1,75 @@
+@inject IChatService ChatService
+@implements IAsyncDisposable
+
+<div class="d-flex flex-column" style="height: 100%;">
+    @if (!ChatService.IsConnected)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+            Connecting to chat...
+        </MudAlert>
+    }
+
+    <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;">
+        <MessageList ChannelId="@ChannelId" />
+    </div>
+
+    <TypingIndicator ChannelId="@ChannelId" />
+    <ChatInput ChannelId="@ChannelId" ChannelName="@ChannelName" />
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid ChannelId { get; set; }
+
+    [Parameter]
+    public string ChannelName { get; set; } = "";
+
+    private Guid _currentChannelId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_currentChannelId == ChannelId)
+            return;
+
+        // Leave the old channel
+        if (_currentChannelId != Guid.Empty)
+        {
+            try
+            {
+                await ChatService.LeaveChannelAsync(_currentChannelId.ToString());
+            }
+            catch
+            {
+                // Ignore errors when leaving channels
+            }
+        }
+
+        _currentChannelId = ChannelId;
+
+        // Connect if not already connected
+        try
+        {
+            await ChatService.ConnectAsync();
+            await ChatService.JoinChannelAsync(ChannelId.ToString());
+        }
+        catch
+        {
+            // Connection errors are shown via the alert
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_currentChannelId != Guid.Empty)
+        {
+            try
+            {
+                await ChatService.LeaveChannelAsync(_currentChannelId.ToString());
+            }
+            catch
+            {
+                // Ignore errors during disposal
+            }
+        }
+    }
+}

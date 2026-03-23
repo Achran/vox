@@ -1,0 +1,54 @@
+@inject IChatService ChatService
+
+<div class="d-flex align-center gap-2 pa-3"
+     style="border-top: 1px solid var(--mud-palette-lines-default);">
+    <MudTextField @bind-Value="_messageText"
+                  Placeholder="@($"Message #{ChannelName}")"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  FullWidth="true"
+                  Immediate="true"
+                  OnKeyUp="OnKeyUpAsync"
+                  Disabled="@(!ChatService.IsConnected)" />
+    <MudIconButton Icon="@Icons.Material.Filled.Send"
+                   Color="Color.Primary"
+                   Disabled="@(string.IsNullOrWhiteSpace(_messageText) || !ChatService.IsConnected)"
+                   OnClick="SendMessageAsync" />
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid ChannelId { get; set; }
+
+    [Parameter]
+    public string ChannelName { get; set; } = "";
+
+    private string _messageText = "";
+    private DateTime _lastTypingSent = DateTime.MinValue;
+
+    private async Task OnKeyUpAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessageAsync();
+            return;
+        }
+
+        // Throttle typing indicator to once every 3 seconds
+        if (!string.IsNullOrWhiteSpace(_messageText) && (DateTime.UtcNow - _lastTypingSent).TotalSeconds > 3)
+        {
+            _lastTypingSent = DateTime.UtcNow;
+            await ChatService.SendTypingAsync(ChannelId.ToString());
+        }
+    }
+
+    private async Task SendMessageAsync()
+    {
+        var text = _messageText?.Trim();
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+
+        _messageText = "";
+        await ChatService.SendMessageAsync(ChannelId.ToString(), text);
+    }
+}

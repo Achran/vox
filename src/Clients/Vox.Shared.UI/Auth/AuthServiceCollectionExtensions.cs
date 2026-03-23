@@ -20,6 +20,8 @@ public static class AuthServiceCollectionExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IServerService, ServerService>();
         services.AddScoped<IChannelService, ChannelService>();
+        services.AddScoped<IMessageService, MessageService>();
+        services.AddScoped<IChatService, ChatService>();
         services.AddScoped<IPresenceService, PresenceService>();
 
         return services;
