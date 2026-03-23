@@ -100,7 +100,7 @@ Vox.sln
 |------|---------|-------|
 | .NET SDK | 9.x | See `global.json` |
 | PostgreSQL | 14+ | For API and Infrastructure |
-| Docker (optional) | Latest | For running PostgreSQL locally |
+| Docker & Docker Compose | Latest | For running PostgreSQL, LiveKit, and Redis locally |
 | VS Code or Visual Studio | Latest | Recommended with C# Dev Kit |
 | MAUI Workload | Latest | Required only for `Vox.Maui` |
 
@@ -119,9 +119,22 @@ cd vox
 dotnet workload install maui
 ```
 
-### 3. Start PostgreSQL
+### 3. Start infrastructure services (PostgreSQL, LiveKit, Redis)
 
-Using Docker:
+Using Docker Compose (recommended):
+
+```bash
+docker compose up -d
+```
+
+This starts:
+- **PostgreSQL 16** on port `5432`
+- **Redis 7** on port `6379`
+- **LiveKit Server** on ports `7880` (HTTP), `7881` (RTC), `7882/udp` (WebRTC)
+
+LiveKit is pre-configured with API key `devkey` and secret `secret` (see `livekit.yaml`).
+
+Alternatively, start only PostgreSQL:
 
 ```bash
 docker run -d \
@@ -188,6 +201,10 @@ dotnet test Vox.sln
 |--------|------|-------------|
 | `GET` | `/health` | Health check |
 | `WS` | `/hubs/chat` | SignalR chat hub |
+| `WS` | `/hubs/voice` | SignalR voice hub |
+| `GET` | `/api/voice/token/{channelId}` | Get LiveKit access token |
+| `POST` | `/api/voice/rooms/{channelId}` | Create a LiveKit voice room |
+| `DELETE` | `/api/voice/rooms/{channelId}` | Delete a LiveKit voice room |
 
 ## Development Notes
 

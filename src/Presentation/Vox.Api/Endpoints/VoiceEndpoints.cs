@@ -15,6 +15,12 @@ public static class VoiceEndpoints
         group.MapGet("/token/{channelId:guid}", GetLiveKitTokenAsync)
             .WithName("GetVoiceToken");
 
+        group.MapPost("/rooms/{channelId:guid}", CreateRoomAsync)
+            .WithName("CreateVoiceRoom");
+
+        group.MapDelete("/rooms/{channelId:guid}", DeleteRoomAsync)
+            .WithName("DeleteVoiceRoom");
+
         return app;
     }
 
@@ -41,5 +47,33 @@ public static class VoiceEndpoints
         var url = liveKitService.GetServerUrl();
 
         return Results.Ok(new { Token = token, Url = url });
+    }
+
+    private static async Task<IResult> CreateRoomAsync(
+        Guid channelId, HttpContext httpContext, ILiveKitService liveKitService)
+    {
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var roomName = $"voice-{channelId}";
+        var created = await liveKitService.CreateRoomAsync(roomName);
+        return Results.Ok(new { Room = created });
+    }
+
+    private static async Task<IResult> DeleteRoomAsync(
+        Guid channelId, HttpContext httpContext, ILiveKitService liveKitService)
+    {
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var roomName = $"voice-{channelId}";
+        await liveKitService.DeleteRoomAsync(roomName);
+        return Results.NoContent();
     }
 }
