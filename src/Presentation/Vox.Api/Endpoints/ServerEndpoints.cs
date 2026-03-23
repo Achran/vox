@@ -25,22 +25,12 @@ public static class ServerEndpoints
         return app;
     }
 
-    private static Guid GetDomainUserId(HttpContext httpContext)
-    {
-        var domainUserId = httpContext.User.FindFirst("domain_user_id")?.Value;
-        if (domainUserId is null || !Guid.TryParse(domainUserId, out var userId))
-        {
-            throw new UnauthorizedAccessException("Domain user ID not found in token.");
-        }
-        return userId;
-    }
-
     private static async Task<IResult> CreateServerAsync(
         CreateServerRequest request, HttpContext httpContext, IMediator mediator, CancellationToken ct)
     {
         try
         {
-            var userId = GetDomainUserId(httpContext);
+            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             var result = await mediator.Send(
                 new CreateServerCommand(request.Name, request.Description, userId), ct);
             return Results.Created($"/api/servers/{result.Id}", result);
@@ -67,7 +57,7 @@ public static class ServerEndpoints
     {
         try
         {
-            var userId = GetDomainUserId(httpContext);
+            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             var result = await mediator.Send(new GetUserServersQuery(userId), ct);
             return Results.Ok(result);
         }
@@ -82,7 +72,7 @@ public static class ServerEndpoints
     {
         try
         {
-            var userId = GetDomainUserId(httpContext);
+            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             var result = await mediator.Send(
                 new UpdateServerCommand(id, request.Name, request.Description, userId), ct);
             return Results.Ok(result);
@@ -106,7 +96,7 @@ public static class ServerEndpoints
     {
         try
         {
-            var userId = GetDomainUserId(httpContext);
+            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             await mediator.Send(new DeleteServerCommand(id, userId), ct);
             return Results.NoContent();
         }
@@ -125,7 +115,7 @@ public static class ServerEndpoints
     {
         try
         {
-            var userId = GetDomainUserId(httpContext);
+            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             var result = await mediator.Send(new JoinServerCommand(id, userId), ct);
             return Results.Ok(result);
         }

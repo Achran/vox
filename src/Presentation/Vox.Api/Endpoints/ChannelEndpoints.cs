@@ -26,22 +26,12 @@ public static class ChannelEndpoints
         return app;
     }
 
-    private static Guid GetDomainUserId(HttpContext httpContext)
-    {
-        var domainUserId = httpContext.User.FindFirst("domain_user_id")?.Value;
-        if (domainUserId is null || !Guid.TryParse(domainUserId, out var userId))
-        {
-            throw new UnauthorizedAccessException("Domain user ID not found in token.");
-        }
-        return userId;
-    }
-
     private static async Task<IResult> CreateChannelAsync(
         Guid serverId, CreateChannelRequest request, HttpContext httpContext, IMediator mediator, CancellationToken ct)
     {
         try
         {
-            var userId = GetDomainUserId(httpContext);
+            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             var result = await mediator.Send(
                 new CreateChannelCommand(serverId, request.Name, request.Type, userId), ct);
             return Results.Created($"/api/channels/{result.Id}", result);
@@ -83,7 +73,7 @@ public static class ChannelEndpoints
     {
         try
         {
-            var userId = GetDomainUserId(httpContext);
+            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             var result = await mediator.Send(
                 new UpdateChannelCommand(id, request.Name, userId), ct);
             return Results.Ok(result);
@@ -107,7 +97,7 @@ public static class ChannelEndpoints
     {
         try
         {
-            var userId = GetDomainUserId(httpContext);
+            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             await mediator.Send(new DeleteChannelCommand(id, userId), ct);
             return Results.NoContent();
         }
