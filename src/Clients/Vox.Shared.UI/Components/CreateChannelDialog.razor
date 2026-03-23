@@ -1,0 +1,88 @@
+@inject IChannelService ChannelService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Add" Class="mr-2" />
+            Create Channel
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="Channel Name" Required="true"
+                      RequiredError="Channel name is required" Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudSelect @bind-Value="_type" Label="Channel Type" Variant="Variant.Outlined">
+            <MudSelectItem Value="@("Text")">
+                <MudIcon Icon="@Icons.Material.Filled.Tag" Class="mr-2" Size="Size.Small" />
+                Text
+            </MudSelectItem>
+            <MudSelectItem Value="@("Voice")">
+                <MudIcon Icon="@Icons.Material.Filled.VolumeUp" Class="mr-2" Size="Size.Small" />
+                Voice
+            </MudSelectItem>
+        </MudSelect>
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3">@_errorMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="SubmitAsync" Disabled="@_submitting">
+            @if (_submitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Create
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public Guid ServerId { get; set; }
+
+    [Parameter]
+    public string DefaultType { get; set; } = "Text";
+
+    private string _name = string.Empty;
+    private string _type = "Text";
+    private string? _errorMessage;
+    private bool _submitting;
+
+    protected override void OnParametersSet()
+    {
+        _type = DefaultType;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _errorMessage = "Channel name is required.";
+            return;
+        }
+
+        _submitting = true;
+        _errorMessage = null;
+
+        var result = await ChannelService.CreateChannelAsync(ServerId, _name.Trim(), _type);
+
+        if (result is not null)
+        {
+            MudDialog.Close(DialogResult.Ok(result));
+        }
+        else
+        {
+            _errorMessage = ChannelService.ErrorMessage ?? "Failed to create channel.";
+        }
+
+        _submitting = false;
+    }
+}

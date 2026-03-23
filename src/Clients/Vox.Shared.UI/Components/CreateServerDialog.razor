@@ -1,0 +1,69 @@
+@inject IServerService ServerService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Add" Class="mr-2" />
+            Create Server
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="Server Name" Required="true"
+                      RequiredError="Server name is required" Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_description" Label="Description" Variant="Variant.Outlined"
+                      Lines="3" />
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3">@_errorMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="SubmitAsync" Disabled="@_submitting">
+            @if (_submitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Create
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string _name = string.Empty;
+    private string? _description;
+    private string? _errorMessage;
+    private bool _submitting;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _errorMessage = "Server name is required.";
+            return;
+        }
+
+        _submitting = true;
+        _errorMessage = null;
+
+        var result = await ServerService.CreateServerAsync(_name.Trim(), _description?.Trim());
+
+        if (result is not null)
+        {
+            MudDialog.Close(DialogResult.Ok(result));
+        }
+        else
+        {
+            _errorMessage = ServerService.ErrorMessage ?? "Failed to create server.";
+        }
+
+        _submitting = false;
+    }
+}
