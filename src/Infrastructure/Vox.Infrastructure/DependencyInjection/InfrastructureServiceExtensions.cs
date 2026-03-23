@@ -113,7 +113,7 @@ public static class InfrastructureServiceExtensions
 
         var liveKitSection = configuration.GetSection("LiveKit");
         services.Configure<LiveKitSettings>(liveKitSection);
-        services.AddSingleton<ILiveKitService, LiveKitService>();
+        services.AddHttpClient<ILiveKitService, LiveKitService>();
 
         return services;
     }
