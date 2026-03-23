@@ -54,6 +54,8 @@ public class ChatHub : Hub
     public async Task GetOnlineUsers()
     {
         var users = _onlineUsers.Values
+            .GroupBy(u => u.UserId)
+            .Select(g => g.First())
             .Select(u => new { u.UserId, u.DisplayName })
             .ToList();
         await Clients.Caller.SendAsync("OnlineUsersList", users);

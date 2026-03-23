@@ -77,22 +77,19 @@ public sealed class PresenceService : IPresenceService
 
     public async Task StopAsync()
     {
+        _onlineUsers.Clear();
+        OnUsersChanged?.Invoke();
+
         if (_hubConnection is not null)
         {
             await _hubConnection.StopAsync();
             await _hubConnection.DisposeAsync();
             _hubConnection = null;
         }
-        _onlineUsers.Clear();
-        OnUsersChanged?.Invoke();
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_hubConnection is not null)
-        {
-            await _hubConnection.DisposeAsync();
-            _hubConnection = null;
-        }
+        await StopAsync();
     }
 }
