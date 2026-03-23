@@ -10,11 +10,13 @@ public class CreateChannelCommandHandlerTests
 {
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<IServerRepository> _serverRepoMock = new();
+    private readonly Mock<IChannelRepository> _channelRepoMock = new();
     private readonly CreateChannelCommandHandler _handler;
 
     public CreateChannelCommandHandlerTests()
     {
         _unitOfWorkMock.Setup(u => u.Servers).Returns(_serverRepoMock.Object);
+        _unitOfWorkMock.Setup(u => u.Channels).Returns(_channelRepoMock.Object);
         _handler = new CreateChannelCommandHandler(_unitOfWorkMock.Object);
     }
 
@@ -36,7 +38,7 @@ public class CreateChannelCommandHandlerTests
         result.Name.Should().Be("new-channel");
         result.Type.Should().Be("Text");
         result.ServerId.Should().Be(server.Id);
-        _serverRepoMock.Verify(r => r.UpdateAsync(server, It.IsAny<CancellationToken>()), Times.Once);
+        _channelRepoMock.Verify(r => r.AddAsync(It.Is<Channel>(c => c.Name == "new-channel"), It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 

@@ -18,8 +18,15 @@ public sealed class JoinServerCommandHandler : IRequestHandler<JoinServerCommand
         var server = await _unitOfWork.Servers.GetByIdAsync(request.ServerId, cancellationToken)
             ?? throw new KeyNotFoundException($"Server with ID '{request.ServerId}' was not found.");
 
+        var wasMember = server.Members.Any(m => m.UserId == request.UserId);
         server.AddMember(request.UserId);
-        await _unitOfWork.Servers.UpdateAsync(server, cancellationToken);
+
+        if (!wasMember)
+        {
+            var newMember = server.Members.First(m => m.UserId == request.UserId);
+            await _unitOfWork.ServerMembers.AddAsync(newMember, cancellationToken);
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ServerDto(
