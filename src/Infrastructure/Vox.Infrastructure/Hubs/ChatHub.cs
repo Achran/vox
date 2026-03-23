@@ -7,10 +7,12 @@ namespace Vox.Infrastructure.Hubs;
 
 public class ChatHub : Hub
 {
+    private readonly IMediator _mediator;
     private readonly IPresenceService _presenceService;
 
-    public ChatHub(IPresenceService presenceService)
+    public ChatHub(IMediator mediator, IPresenceService presenceService)
     {
+        _mediator = mediator;
         _presenceService = presenceService;
     }
 
@@ -33,6 +35,16 @@ public class ChatHub : Hub
             result.Content,
             Timestamp = result.CreatedAt
         });
+    }
+
+    public async Task JoinServer(string serverId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"server:{serverId}");
+    }
+
+    public async Task LeaveServer(string serverId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"server:{serverId}");
     }
 
     public async Task JoinChannel(string channelId)
@@ -68,7 +80,15 @@ public class ChatHub : Hub
         var userId = Context.UserIdentifier;
         if (userId is not null)
         {
-            await _presenceService.UserConnectedAsync(Context.ConnectionId, userId);
+            var isFirstConnection = await _presenceService.UserConnectedAsync(Context.ConnectionId, userId);
+
+            if (isFirstConnection)
+            {
+                var displayName = Context.User?.FindFirst("display_name")?.Value
+                                  ?? Context.User?.FindFirst("unique_name")?.Value
+                                  ?? "User";
+                await Clients.Others.SendAsync("UserOnline", new { UserId = userId, DisplayName = displayName });
+            }
         }
 
         await base.OnConnectedAsync();
@@ -79,17 +99,21 @@ public class ChatHub : Hub
         var userId = Context.UserIdentifier;
         var channels = _presenceService.GetChannelsByConnectionId(Context.ConnectionId);
 
-        await _presenceService.UserDisconnectedAsync(Context.ConnectionId);
+        var isLastConnection = await _presenceService.UserDisconnectedAsync(Context.ConnectionId);
 
         if (userId is not null)
         {
-            // Per-channel: notify if user no longer has presence in that channel
             foreach (var channelId in channels)
             {
                 if (!_presenceService.IsUserInChannel(userId, channelId))
                 {
                     await Clients.Group(channelId).SendAsync("UserStatusChanged", userId, "Offline");
                 }
+            }
+
+            if (isLastConnection)
+            {
+                await Clients.Others.SendAsync("UserOffline", userId);
             }
         }
 

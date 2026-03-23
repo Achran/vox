@@ -31,12 +31,13 @@ public sealed class PresenceService : IPresenceService
         _timeProvider = timeProvider;
     }
 
-    public Task UserConnectedAsync(string connectionId, string userId)
+    public Task<bool> UserConnectedAsync(string connectionId, string userId)
     {
         _connectionUserMap[connectionId] = userId;
         _connectionChannelMap[connectionId] = new ConcurrentDictionary<string, byte>();
         _heartbeatMap[connectionId] = _timeProvider.GetUtcNow();
 
+        bool isFirstConnection;
         var userLock = GetUserLock(userId);
         lock (userLock)
         {
@@ -44,19 +45,25 @@ public sealed class PresenceService : IPresenceService
             {
                 connections = new ConcurrentDictionary<string, byte>();
                 _userConnectionMap[userId] = connections;
+                isFirstConnection = true;
+            }
+            else
+            {
+                isFirstConnection = connections.IsEmpty;
             }
             connections.TryAdd(connectionId, 0);
         }
 
-        return Task.CompletedTask;
+        return Task.FromResult(isFirstConnection);
     }
 
-    public Task UserDisconnectedAsync(string connectionId)
+    public Task<bool> UserDisconnectedAsync(string connectionId)
     {
         _connectionUserMap.TryRemove(connectionId, out var userId);
         _connectionChannelMap.TryRemove(connectionId, out _);
         _heartbeatMap.TryRemove(connectionId, out _);
 
+        bool isLastConnection = false;
         if (userId is not null)
         {
             var userLock = GetUserLock(userId);
@@ -69,12 +76,13 @@ public sealed class PresenceService : IPresenceService
                     {
                         _userConnectionMap.TryRemove(userId, out _);
                         _userLocks.TryRemove(userId, out _);
+                        isLastConnection = true;
                     }
                 }
             }
         }
 
-        return Task.CompletedTask;
+        return Task.FromResult(isLastConnection);
     }
 
     public Task UserJoinedChannelAsync(string connectionId, string channelId)

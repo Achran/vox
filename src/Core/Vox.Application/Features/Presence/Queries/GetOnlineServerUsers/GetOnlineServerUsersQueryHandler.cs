@@ -27,8 +27,20 @@ public sealed class GetOnlineServerUsersQueryHandler
         var memberUserIds = server.Members.Select(m => m.UserId).ToList();
         var onlineUserIds = _presenceService.GetOnlineUserIdsForServer(memberUserIds);
 
-        return onlineUserIds
-            .Select(uid => new PresenceUserDto(uid, "Online"))
-            .ToList();
+        var tasks = onlineUserIds.Select(async uid =>
+        {
+            if (Guid.TryParse(uid, out var userGuid))
+            {
+                var user = await _unitOfWork.Users.GetByIdAsync(userGuid, cancellationToken);
+                return new PresenceUserDto(uid, "Online", user?.DisplayName);
+            }
+            else
+            {
+                return new PresenceUserDto(uid, "Online");
+            }
+        });
+
+        var results = await Task.WhenAll(tasks);
+        return results.ToList();
     }
 }
