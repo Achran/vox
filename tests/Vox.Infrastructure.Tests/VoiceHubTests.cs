@@ -426,4 +426,176 @@ public class VoiceHubTests
         var act = () => _hub.SendOffer("target", "channel", "sdp");
         await act.Should().ThrowAsync<HubException>().WithMessage("Unauthorized.");
     }
+
+    [Fact]
+    public async Task LeaveVoiceChannel_WithoutAuth_ThrowsHubException()
+    {
+        // Arrange
+        _contextMock.Setup(c => c.UserIdentifier).Returns((string?)null);
+
+        // Act & Assert
+        var act = () => _hub.LeaveVoiceChannel(Guid.NewGuid().ToString());
+        await act.Should().ThrowAsync<HubException>().WithMessage("Unauthorized.");
+    }
+
+    [Fact]
+    public async Task SendAnswer_WithoutAuth_ThrowsHubException()
+    {
+        // Arrange
+        _contextMock.Setup(c => c.UserIdentifier).Returns((string?)null);
+
+        // Act & Assert
+        var act = () => _hub.SendAnswer("target", "channel", "sdp");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Unauthorized.");
+    }
+
+    [Fact]
+    public async Task SendIceCandidate_WithoutAuth_ThrowsHubException()
+    {
+        // Arrange
+        _contextMock.Setup(c => c.UserIdentifier).Returns((string?)null);
+
+        // Act & Assert
+        var act = () => _hub.SendIceCandidate("target", "channel", "candidate");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Unauthorized.");
+    }
+
+    // -------------------------------------------------------------------------
+    // OnDisconnectedAsync – additional scenarios
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task OnDisconnectedAsync_NoChannels_CompletesWithoutError()
+    {
+        // Arrange
+        var userId = Guid.NewGuid().ToString();
+        var connectionId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(userId);
+        _contextMock.Setup(c => c.ConnectionId).Returns(connectionId);
+
+        _voiceSessionMock.Setup(v => v.RemoveConnection(connectionId))
+            .Returns(new List<string>());
+
+        // Act & Assert – should complete without calling SendAsync
+        await _hub.OnDisconnectedAsync(null);
+
+        _groupProxyMock.Verify(
+            c => c.SendCoreAsync("UserLeftVoice", It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task OnDisconnectedAsync_MultipleChannels_NotifiesEachChannel()
+    {
+        // Arrange
+        var userId = Guid.NewGuid().ToString();
+        var connectionId = Guid.NewGuid().ToString();
+        var channelId1 = Guid.NewGuid().ToString();
+        var channelId2 = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(userId);
+        _contextMock.Setup(c => c.ConnectionId).Returns(connectionId);
+
+        _voiceSessionMock.Setup(v => v.RemoveConnection(connectionId))
+            .Returns(new List<string> { channelId1, channelId2 });
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId1, userId)).Returns(false);
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId2, userId)).Returns(false);
+
+        var group1Mock = new Mock<IClientProxy>();
+        var group2Mock = new Mock<IClientProxy>();
+        _clientsMock.Setup(c => c.Group($"voice:{channelId1}")).Returns(group1Mock.Object);
+        _clientsMock.Setup(c => c.Group($"voice:{channelId2}")).Returns(group2Mock.Object);
+
+        // Act
+        await _hub.OnDisconnectedAsync(null);
+
+        // Assert – both channels get notified
+        group1Mock.Verify(
+            c => c.SendCoreAsync("UserLeftVoice", It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        group2Mock.Verify(
+            c => c.SendCoreAsync("UserLeftVoice", It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task OnDisconnectedAsync_WithException_StillCleansUp()
+    {
+        // Arrange
+        var userId = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+        var connectionId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(userId);
+        _contextMock.Setup(c => c.ConnectionId).Returns(connectionId);
+
+        _voiceSessionMock.Setup(v => v.RemoveConnection(connectionId))
+            .Returns(new List<string> { channelId });
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, userId)).Returns(false);
+
+        _clientsMock.Setup(c => c.Group($"voice:{channelId}")).Returns(_groupProxyMock.Object);
+
+        // Act – pass an exception (simulating connection error)
+        await _hub.OnDisconnectedAsync(new Exception("Connection lost"));
+
+        // Assert – cleanup still happens
+        _voiceSessionMock.Verify(v => v.RemoveConnection(connectionId), Times.Once);
+        _groupProxyMock.Verify(
+            c => c.SendCoreAsync("UserLeftVoice", It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task OnDisconnectedAsync_NullUserIdentifier_StillRemovesConnection()
+    {
+        // Arrange
+        var connectionId = Guid.NewGuid().ToString();
+        _contextMock.Setup(c => c.UserIdentifier).Returns((string?)null);
+        _contextMock.Setup(c => c.ConnectionId).Returns(connectionId);
+
+        _voiceSessionMock.Setup(v => v.RemoveConnection(connectionId))
+            .Returns(new List<string> { "some-channel" });
+
+        // Act
+        await _hub.OnDisconnectedAsync(null);
+
+        // Assert – connection is removed but no group notification since userId is null
+        _voiceSessionMock.Verify(v => v.RemoveConnection(connectionId), Times.Once);
+        _groupProxyMock.Verify(
+            c => c.SendCoreAsync("UserLeftVoice", It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    // -------------------------------------------------------------------------
+    // Signaling flow – full offer/answer/ICE exchange scenario
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task FullSignalingFlow_OfferAnswerIce_AllRelayed()
+    {
+        // Arrange – two users in the same channel
+        var user1Id = Guid.NewGuid().ToString();
+        var user2Id = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+
+        SetupAuthenticatedUser(user1Id);
+
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, user1Id)).Returns(true);
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, user2Id)).Returns(true);
+        _clientsMock.Setup(c => c.User(user2Id)).Returns(_userProxyMock.Object);
+
+        // Act – send offer, answer, ICE candidate in sequence
+        await _hub.SendOffer(user2Id, channelId, "sdp-offer");
+        await _hub.SendAnswer(user2Id, channelId, "sdp-answer");
+        await _hub.SendIceCandidate(user2Id, channelId, "ice-candidate");
+
+        // Assert – all three messages relayed
+        _userProxyMock.Verify(
+            c => c.SendCoreAsync("ReceiveOffer", It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _userProxyMock.Verify(
+            c => c.SendCoreAsync("ReceiveAnswer", It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _userProxyMock.Verify(
+            c => c.SendCoreAsync("ReceiveIceCandidate", It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 }

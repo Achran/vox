@@ -177,4 +177,155 @@ public class VoiceSessionServiceTests
         _service.IsUserInVoiceChannel("channel-1", "user-1").Should().BeTrue();
         _service.GetParticipants("channel-1").Should().Contain("user-1");
     }
+
+    // -------------------------------------------------------------------------
+    // JoinChannel – additional coverage
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void JoinChannel_SameConnectionSameChannel_IsIdempotent()
+    {
+        _service.JoinChannel("channel-1", "user-1", "conn-1");
+        var result = _service.JoinChannel("channel-1", "user-1", "conn-1");
+
+        result.Should().BeFalse();
+        _service.GetParticipants("channel-1").Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void JoinChannel_UserInMultipleChannels_TrackedInBoth()
+    {
+        _service.JoinChannel("channel-1", "user-1", "conn-1");
+        _service.JoinChannel("channel-2", "user-1", "conn-1");
+
+        _service.IsUserInVoiceChannel("channel-1", "user-1").Should().BeTrue();
+        _service.IsUserInVoiceChannel("channel-2", "user-1").Should().BeTrue();
+    }
+
+    [Fact]
+    public void JoinChannel_MultipleUsersMultipleChannels_AllTracked()
+    {
+        _service.JoinChannel("channel-1", "user-1", "conn-1");
+        _service.JoinChannel("channel-1", "user-2", "conn-2");
+        _service.JoinChannel("channel-2", "user-1", "conn-1");
+        _service.JoinChannel("channel-2", "user-3", "conn-3");
+
+        _service.GetParticipants("channel-1").Should().BeEquivalentTo(new[] { "user-1", "user-2" });
+        _service.GetParticipants("channel-2").Should().BeEquivalentTo(new[] { "user-1", "user-3" });
+    }
+
+    // -------------------------------------------------------------------------
+    // LeaveChannel – additional coverage
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void LeaveChannel_AfterAllConnectionsRemoved_UserNotInChannel()
+    {
+        _service.JoinChannel("channel-1", "user-1", "conn-1");
+        _service.JoinChannel("channel-1", "user-1", "conn-2");
+        _service.LeaveChannel("channel-1", "user-1", "conn-1");
+        _service.LeaveChannel("channel-1", "user-1", "conn-2");
+
+        _service.IsUserInVoiceChannel("channel-1", "user-1").Should().BeFalse();
+        _service.GetParticipants("channel-1").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void LeaveChannel_OnlyAffectsSpecifiedChannel()
+    {
+        _service.JoinChannel("channel-1", "user-1", "conn-1");
+        _service.JoinChannel("channel-2", "user-1", "conn-1");
+        _service.LeaveChannel("channel-1", "user-1", "conn-1");
+
+        _service.IsUserInVoiceChannel("channel-1", "user-1").Should().BeFalse();
+        _service.IsUserInVoiceChannel("channel-2", "user-1").Should().BeTrue();
+    }
+
+    [Fact]
+    public void LeaveChannel_NonExistentUser_ReturnsFalse()
+    {
+        _service.JoinChannel("channel-1", "user-1", "conn-1");
+
+        var result = _service.LeaveChannel("channel-1", "user-2", "conn-2");
+
+        result.Should().BeFalse();
+    }
+
+    // -------------------------------------------------------------------------
+    // RemoveConnection – additional coverage
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void RemoveConnection_MultipleChannels_CleansUpAll()
+    {
+        _service.JoinChannel("channel-1", "user-1", "conn-1");
+        _service.JoinChannel("channel-2", "user-1", "conn-1");
+        _service.JoinChannel("channel-3", "user-1", "conn-1");
+
+        var leftChannels = _service.RemoveConnection("conn-1");
+
+        leftChannels.Should().HaveCount(3);
+        _service.IsUserInVoiceChannel("channel-1", "user-1").Should().BeFalse();
+        _service.IsUserInVoiceChannel("channel-2", "user-1").Should().BeFalse();
+        _service.IsUserInVoiceChannel("channel-3", "user-1").Should().BeFalse();
+    }
+
+    [Fact]
+    public void RemoveConnection_DoesNotAffectOtherUsers()
+    {
+        _service.JoinChannel("channel-1", "user-1", "conn-1");
+        _service.JoinChannel("channel-1", "user-2", "conn-2");
+
+        _service.RemoveConnection("conn-1");
+
+        _service.IsUserInVoiceChannel("channel-1", "user-2").Should().BeTrue();
+        _service.GetParticipants("channel-1").Should().BeEquivalentTo(new[] { "user-2" });
+    }
+
+    // -------------------------------------------------------------------------
+    // Concurrent access
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ConcurrentJoinAndLeave_MaintainsConsistency()
+    {
+        const int userCount = 50;
+        var channelId = "concurrent-channel";
+
+        // Join all users concurrently
+        var joinTasks = Enumerable.Range(0, userCount).Select(i =>
+            Task.Run(() => _service.JoinChannel(channelId, $"user-{i}", $"conn-{i}"))).ToArray();
+
+        await Task.WhenAll(joinTasks);
+
+        _service.GetParticipants(channelId).Should().HaveCount(userCount);
+
+        // Leave all users concurrently
+        var leaveTasks = Enumerable.Range(0, userCount).Select(i =>
+            Task.Run(() => _service.LeaveChannel(channelId, $"user-{i}", $"conn-{i}"))).ToArray();
+
+        await Task.WhenAll(leaveTasks);
+
+        _service.GetParticipants(channelId).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ConcurrentRemoveConnection_DoesNotThrow()
+    {
+        const int connectionCount = 50;
+        var channelId = "concurrent-channel";
+
+        for (var i = 0; i < connectionCount; i++)
+        {
+            _service.JoinChannel(channelId, $"user-{i}", $"conn-{i}");
+        }
+
+        var tasks = Enumerable.Range(0, connectionCount).Select(i =>
+            Task.Run(() => _service.RemoveConnection($"conn-{i}"))).ToArray();
+
+        var act = () => Task.WhenAll(tasks);
+        await act.Should().NotThrowAsync();
+
+        _service.GetParticipants(channelId).Should().BeEmpty();
+    }
 }
