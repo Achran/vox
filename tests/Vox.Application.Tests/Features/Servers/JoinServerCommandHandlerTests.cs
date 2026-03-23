@@ -10,11 +10,13 @@ public class JoinServerCommandHandlerTests
 {
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<IServerRepository> _serverRepoMock = new();
+    private readonly Mock<IServerMemberRepository> _memberRepoMock = new();
     private readonly JoinServerCommandHandler _handler;
 
     public JoinServerCommandHandlerTests()
     {
         _unitOfWorkMock.Setup(u => u.Servers).Returns(_serverRepoMock.Object);
+        _unitOfWorkMock.Setup(u => u.ServerMembers).Returns(_memberRepoMock.Object);
         _handler = new JoinServerCommandHandler(_unitOfWorkMock.Object);
     }
 
@@ -36,7 +38,7 @@ public class JoinServerCommandHandlerTests
         // Assert
         result.Name.Should().Be("Test");
         result.OwnerId.Should().Be(ownerId);
-        _serverRepoMock.Verify(r => r.UpdateAsync(server, It.IsAny<CancellationToken>()), Times.Once);
+        _memberRepoMock.Verify(r => r.AddAsync(It.Is<ServerMember>(m => m.UserId == newUserId), It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 

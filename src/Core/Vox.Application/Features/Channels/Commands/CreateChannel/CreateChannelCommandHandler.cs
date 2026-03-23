@@ -30,7 +30,7 @@ public sealed class CreateChannelCommandHandler : IRequestHandler<CreateChannelC
         }
 
         var channel = server.AddChannel(request.Name, channelType);
-        await _unitOfWork.Servers.UpdateAsync(server, cancellationToken);
+        await _unitOfWork.Channels.AddAsync(channel, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ChannelDto(
