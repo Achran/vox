@@ -110,10 +110,12 @@ public sealed class VoiceService : IVoiceService
 
         CurrentChannelId = channelId;
 
-        if (IsConnected)
+        if (!IsConnected)
         {
-            await _hubConnection!.InvokeAsync("JoinVoiceChannel", channelId);
+            await ConnectAsync();
         }
+
+        await _hubConnection!.InvokeAsync("JoinVoiceChannel", channelId);
 
         StateChanged?.Invoke();
     }
