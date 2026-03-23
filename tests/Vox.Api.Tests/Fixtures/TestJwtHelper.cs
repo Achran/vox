@@ -20,19 +20,25 @@ public static class TestJwtHelper
         string email,
         string userName,
         string displayName,
-        TimeSpan? lifetime = null)
+        TimeSpan? lifetime = null,
+        string? domainUserId = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, userId),
-            new Claim(JwtRegisteredClaimNames.Email, email),
-            new Claim("unique_name", userName),
-            new Claim("display_name", displayName),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(JwtRegisteredClaimNames.Sub, userId),
+            new(JwtRegisteredClaimNames.Email, email),
+            new("unique_name", userName),
+            new("display_name", displayName),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
+
+        if (domainUserId is not null)
+        {
+            claims.Add(new Claim("domain_user_id", domainUserId));
+        }
 
         var token = new JwtSecurityToken(
             issuer: Issuer,

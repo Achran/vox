@@ -43,6 +43,8 @@ app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Timestamp = Dat
 app.MapAuthEndpoints();
 app.MapExternalAuthEndpoints();
 app.MapAccountLinkEndpoints();
+app.MapServerEndpoints();
+app.MapChannelEndpoints();
 
 app.Run();
 

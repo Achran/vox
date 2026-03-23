@@ -25,6 +25,13 @@ public class Channel : BaseEntity
         };
     }
 
+    public void UpdateName(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        Name = name;
+        SetUpdatedAt();
+    }
+
     public Message PostMessage(Guid authorId, string content)
     {
         var message = Message.Create(authorId, Id, content);
