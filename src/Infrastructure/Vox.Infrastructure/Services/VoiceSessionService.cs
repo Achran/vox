@@ -27,7 +27,9 @@ public sealed class VoiceSessionService : IVoiceSessionService
         var connectionLock = GetConnectionLock(connectionId);
         bool isNewParticipant;
 
-        // Always lock on connection first, then channel, to avoid deadlocks
+        // Lock connection first, then channel. This order prevents deadlocks when
+        // multiple threads operate on the same connection across different channels,
+        // because RemoveConnection also acquires the connection lock first.
         lock (connectionLock)
         {
             lock (channelLock)

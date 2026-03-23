@@ -282,6 +282,72 @@ public class VoiceHubTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task SendAnswer_SenderNotInChannel_ThrowsHubException()
+    {
+        // Arrange
+        var senderId = Guid.NewGuid().ToString();
+        var targetId = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(senderId);
+
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, senderId)).Returns(false);
+
+        // Act & Assert
+        var act = () => _hub.SendAnswer(targetId, channelId, "sdp");
+        await act.Should().ThrowAsync<HubException>().WithMessage("You are not in this voice channel.");
+    }
+
+    [Fact]
+    public async Task SendAnswer_TargetNotInChannel_ThrowsHubException()
+    {
+        // Arrange
+        var senderId = Guid.NewGuid().ToString();
+        var targetId = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(senderId);
+
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, senderId)).Returns(true);
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, targetId)).Returns(false);
+
+        // Act & Assert
+        var act = () => _hub.SendAnswer(targetId, channelId, "sdp");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Target user is not in this voice channel.");
+    }
+
+    [Fact]
+    public async Task SendIceCandidate_SenderNotInChannel_ThrowsHubException()
+    {
+        // Arrange
+        var senderId = Guid.NewGuid().ToString();
+        var targetId = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(senderId);
+
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, senderId)).Returns(false);
+
+        // Act & Assert
+        var act = () => _hub.SendIceCandidate(targetId, channelId, "candidate");
+        await act.Should().ThrowAsync<HubException>().WithMessage("You are not in this voice channel.");
+    }
+
+    [Fact]
+    public async Task SendIceCandidate_TargetNotInChannel_ThrowsHubException()
+    {
+        // Arrange
+        var senderId = Guid.NewGuid().ToString();
+        var targetId = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(senderId);
+
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, senderId)).Returns(true);
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, targetId)).Returns(false);
+
+        // Act & Assert
+        var act = () => _hub.SendIceCandidate(targetId, channelId, "candidate");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Target user is not in this voice channel.");
+    }
+
     // -------------------------------------------------------------------------
     // OnDisconnectedAsync
     // -------------------------------------------------------------------------
