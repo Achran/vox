@@ -122,4 +122,41 @@ public class ServerTests
         // Assert
         Assert.Equal(2, server.Members.Count);
     }
+
+    [Fact]
+    public void Update_ChangesNameAndDescription()
+    {
+        // Arrange
+        var server = Server.Create("Old Name", Guid.NewGuid(), "Old Description");
+
+        // Act
+        server.Update("New Name", "New Description");
+
+        // Assert
+        Assert.Equal("New Name", server.Name);
+        Assert.Equal("New Description", server.Description);
+    }
+
+    [Fact]
+    public void Update_WithEmptyName_ThrowsArgumentException()
+    {
+        // Arrange
+        var server = Server.Create("Test", Guid.NewGuid());
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => server.Update(""));
+    }
+
+    [Fact]
+    public void Update_WithNullDescription_SetsDescriptionToNull()
+    {
+        // Arrange
+        var server = Server.Create("Test", Guid.NewGuid(), "Original");
+
+        // Act
+        server.Update("Test");
+
+        // Assert
+        Assert.Null(server.Description);
+    }
 }

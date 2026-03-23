@@ -75,4 +75,27 @@ public class ChannelTests
         // Assert
         Assert.Equal(2, channel.Messages.Count);
     }
+
+    [Fact]
+    public void UpdateName_ChangesChannelName()
+    {
+        // Arrange
+        var channel = Channel.Create("old-name", ChannelType.Text, Guid.NewGuid());
+
+        // Act
+        channel.UpdateName("new-name");
+
+        // Assert
+        Assert.Equal("new-name", channel.Name);
+    }
+
+    [Fact]
+    public void UpdateName_WithEmptyName_ThrowsArgumentException()
+    {
+        // Arrange
+        var channel = Channel.Create("test", ChannelType.Text, Guid.NewGuid());
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => channel.UpdateName(""));
+    }
 }
