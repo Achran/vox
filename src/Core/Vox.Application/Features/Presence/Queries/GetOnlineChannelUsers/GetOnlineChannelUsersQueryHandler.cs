@@ -1,6 +1,7 @@
 using MediatR;
 using Vox.Application.Abstractions;
 using Vox.Application.DTOs;
+using Vox.Domain.Interfaces.Repositories;
 
 namespace Vox.Application.Features.Presence.Queries.GetOnlineChannelUsers;
 
@@ -8,26 +9,37 @@ public sealed class GetOnlineChannelUsersQueryHandler
     : IRequestHandler<GetOnlineChannelUsersQuery, IReadOnlyList<PresenceUserDto>>
 {
     private readonly IPresenceService _presenceService;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public GetOnlineChannelUsersQueryHandler(IPresenceService presenceService)
+    public GetOnlineChannelUsersQueryHandler(IPresenceService presenceService, IUnitOfWork unitOfWork)
     {
         _presenceService = presenceService;
+        _unitOfWork = unitOfWork;
     }
 
-    public Task<IReadOnlyList<PresenceUserDto>> Handle(
+    public async Task<IReadOnlyList<PresenceUserDto>> Handle(
         GetOnlineChannelUsersQuery request,
         CancellationToken cancellationToken)
     {
+        _ = await _unitOfWork.Channels.GetByIdAsync(request.ChannelId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Channel with ID '{request.ChannelId}' was not found.");
+
         var onlineUserIds = _presenceService.GetOnlineUserIdsForChannel(request.ChannelId.ToString());
 
-        if (onlineUserIds is null)
+        var tasks = onlineUserIds.Select(async uid =>
         {
-            throw new KeyNotFoundException($"Channel with ID '{request.ChannelId}' was not found.");
-        }
-        IReadOnlyList<PresenceUserDto> result = onlineUserIds
-            .Select(uid => new PresenceUserDto(uid, "Online"))
-            .ToList();
+            if (Guid.TryParse(uid, out var userGuid))
+            {
+                var user = await _unitOfWork.Users.GetByIdAsync(userGuid, cancellationToken);
+                return new PresenceUserDto(uid, "Online", user?.DisplayName);
+            }
+            else
+            {
+                return new PresenceUserDto(uid, "Online");
+            }
+        });
 
-        return Task.FromResult(result);
+        var results = await Task.WhenAll(tasks);
+        return results.ToList();
     }
 }
