@@ -39,7 +39,7 @@
         await TokenStorage.SetTokensAsync(accessToken, refreshToken);
         AuthStateProvider.NotifyUserAuthenticated(accessToken);
 
-        Navigation.NavigateTo("/", forceLoad: false);
+        Navigation.NavigateTo("/", forceLoad: false, replace: true);
     }
 
     private static Dictionary<string, string> ParseQueryString(string queryString)
