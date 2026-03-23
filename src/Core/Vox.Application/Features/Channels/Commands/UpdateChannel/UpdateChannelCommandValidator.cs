@@ -11,6 +11,7 @@ public sealed class UpdateChannelCommandValidator : AbstractValidator<UpdateChan
 
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("Channel name is required.")
+            .Must(name => !string.IsNullOrWhiteSpace(name)).WithMessage("Channel name must not be empty or whitespace.")
             .MaximumLength(100).WithMessage("Channel name must not exceed 100 characters.");
 
         RuleFor(x => x.RequestingUserId)
