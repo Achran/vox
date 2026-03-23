@@ -19,16 +19,15 @@ public class GetChannelMessagesQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ChannelHasMessages_ReturnsMessageDtos()
+    public async Task Handle_ChannelHasMessages_ReturnsMessageDtosInDescendingOrder()
     {
-        // Arrange
+        // Arrange — repository returns messages in CreatedAt descending order (newest first)
         var channelId = Guid.NewGuid();
         var authorId = Guid.NewGuid();
-        var messages = new List<Message>
-        {
-            Message.Create(authorId, channelId, "First message"),
-            Message.Create(authorId, channelId, "Second message")
-        };
+        var olderMessage = Message.Create(authorId, channelId, "First message");
+        var newerMessage = Message.Create(authorId, channelId, "Second message");
+
+        var messages = new List<Message> { newerMessage, olderMessage };
 
         _messageRepoMock.Setup(r => r.GetByChannelIdAsync(channelId, 50, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(messages);
@@ -38,10 +37,10 @@ public class GetChannelMessagesQueryHandlerTests
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
 
-        // Assert
+        // Assert — order matches repository contract (newest first)
         result.Should().HaveCount(2);
-        result[0].Content.Should().Be("First message");
-        result[1].Content.Should().Be("Second message");
+        result[0].Content.Should().Be("Second message");
+        result[1].Content.Should().Be("First message");
     }
 
     [Fact]
