@@ -289,14 +289,19 @@ public sealed class IdentityService : IIdentityService
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var expiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email!),
-            new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName!),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim("display_name", user.DisplayName)
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.Email, user.Email!),
+            new(JwtRegisteredClaimNames.UniqueName, user.UserName!),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new("display_name", user.DisplayName)
         };
+
+        if (user.DomainUserId.HasValue)
+        {
+            claims.Add(new Claim("domain_user_id", user.DomainUserId.Value.ToString()));
+        }
 
         var token = new JwtSecurityToken(
             issuer: _jwtSettings.Issuer,

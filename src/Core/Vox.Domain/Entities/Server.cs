@@ -43,6 +43,14 @@ public class Server : BaseEntity
         return channel;
     }
 
+    public void Update(string name, string? description = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        Name = name;
+        Description = description;
+        SetUpdatedAt();
+    }
+
     public void AddMember(Guid userId)
     {
         if (_members.Any(m => m.UserId == userId))
