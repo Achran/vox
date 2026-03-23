@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using Vox.Application.Features.Auth.Commands.Login;
 using Vox.Application.Features.Auth.Commands.RefreshToken;
@@ -43,6 +44,10 @@ public static class AuthEndpoints
                 new RegisterCommand(request.UserName, request.Email, request.DisplayName, request.Password), ct);
             return Results.Ok(result);
         }
+        catch (ValidationException ex)
+        {
+            return Results.BadRequest(new { errors = ex.Errors.Select(e => new { e.PropertyName, e.ErrorMessage }) });
+        }
         catch (InvalidOperationException ex)
         {
             return Results.BadRequest(new { error = ex.Message });
@@ -55,6 +60,10 @@ public static class AuthEndpoints
         {
             var result = await mediator.Send(new LoginCommand(request.Email, request.Password), ct);
             return Results.Ok(result);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.BadRequest(new { errors = ex.Errors.Select(e => new { e.PropertyName, e.ErrorMessage }) });
         }
         catch (UnauthorizedAccessException)
         {
