@@ -46,10 +46,18 @@
     [Parameter]
     public Guid ServerId { get; set; }
 
+    [Parameter]
+    public string DefaultType { get; set; } = "Text";
+
     private string _name = string.Empty;
     private string _type = "Text";
     private string? _errorMessage;
     private bool _submitting;
+
+    protected override void OnParametersSet()
+    {
+        _type = DefaultType;
+    }
 
     private void Cancel() => MudDialog.Cancel();
 

@@ -10,13 +10,13 @@
 <div style="display: flex; height: calc(100vh - 120px); margin: -16px;">
     <ServerSidebar @ref="_serverSidebar"
                    SelectedServerId="@_selectedServer?.Id"
-                   OnServerSelected="OnServerSelectedAsync"
+                   OnServerSelected="OnServerSelected"
                    OnServersChanged="OnServersChangedAsync" />
 
     <ChannelList @ref="_channelList"
                  Server="@_selectedServer"
                  SelectedChannelId="@_selectedChannel?.Id"
-                 OnChannelSelected="OnChannelSelectedAsync"
+                 OnChannelSelected="OnChannelSelected"
                  OnChannelsChanged="StateHasChanged"
                  OnServerUpdated="OnServerUpdatedAsync"
                  OnServerDeleted="OnServerDeletedAsync" />
@@ -97,14 +97,14 @@
         }
     }
 
-    private void OnServerSelectedAsync(ServerResponse server)
+    private void OnServerSelected(ServerResponse server)
     {
         _selectedServer = server;
         _selectedChannel = null;
         Navigation.NavigateTo($"/servers/{server.Id}");
     }
 
-    private void OnChannelSelectedAsync(ChannelResponse channel)
+    private void OnChannelSelected(ChannelResponse channel)
     {
         _selectedChannel = channel;
         if (_selectedServer is not null)

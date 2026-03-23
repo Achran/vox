@@ -218,7 +218,8 @@
     {
         var parameters = new DialogParameters<CreateChannelDialog>
         {
-            { x => x.ServerId, Server!.Id }
+            { x => x.ServerId, Server!.Id },
+            { x => x.DefaultType, defaultType }
         };
 
         var dialog = await DialogService.ShowAsync<CreateChannelDialog>("Create Channel", parameters,
