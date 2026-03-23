@@ -280,4 +280,231 @@ public class LiveKitServiceTests
 
         await act.Should().ThrowAsync<HttpRequestException>();
     }
+
+    // -------------------------------------------------------------------------
+    // GenerateToken – additional coverage
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void GenerateToken_UsesHmacSha256Algorithm()
+    {
+        var service = CreateService();
+
+        var token = service.GenerateToken("user-1", "Test User", "voice-room");
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(token);
+
+        jwt.Header.Alg.Should().Be("HS256");
+    }
+
+    [Fact]
+    public void GenerateToken_DifferentRooms_ProduceDifferentTokens()
+    {
+        var service = CreateService();
+
+        var token1 = service.GenerateToken("user-1", "Test User", "voice-room-1");
+        var token2 = service.GenerateToken("user-1", "Test User", "voice-room-2");
+
+        token1.Should().NotBe(token2);
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt1 = handler.ReadJwtToken(token1);
+        var jwt2 = handler.ReadJwtToken(token2);
+
+        var video1 = jwt1.Payload["video"] as System.Text.Json.JsonElement?;
+        var video2 = jwt2.Payload["video"] as System.Text.Json.JsonElement?;
+        video1!.Value.GetProperty("room").GetString().Should().Be("voice-room-1");
+        video2!.Value.GetProperty("room").GetString().Should().Be("voice-room-2");
+    }
+
+    [Fact]
+    public void GenerateToken_DifferentUsers_ProduceDifferentTokens()
+    {
+        var service = CreateService();
+
+        var token1 = service.GenerateToken("user-1", "User One", "voice-room");
+        var token2 = service.GenerateToken("user-2", "User Two", "voice-room");
+
+        token1.Should().NotBe(token2);
+    }
+
+    // -------------------------------------------------------------------------
+    // GenerateServiceToken – additional coverage
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void GenerateServiceToken_WithMissingApiKey_ThrowsInvalidOperationException()
+    {
+        var settings = Options.Create(new LiveKitSettings { ApiKey = "", ApiSecret = TestApiSecret, Url = TestUrl });
+        var service = new LiveKitService(settings, new HttpClient());
+
+        var act = () => service.GenerateServiceToken(roomCreate: true);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*ApiKey*");
+    }
+
+    [Fact]
+    public void GenerateServiceToken_WithMissingApiSecret_ThrowsInvalidOperationException()
+    {
+        var settings = Options.Create(new LiveKitSettings { ApiKey = TestApiKey, ApiSecret = "", Url = TestUrl });
+        var service = new LiveKitService(settings, new HttpClient());
+
+        var act = () => service.GenerateServiceToken(roomCreate: true);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*ApiSecret*");
+    }
+
+    [Fact]
+    public void GenerateServiceToken_WithRoomList_ContainsGrant()
+    {
+        var service = CreateService();
+
+        var token = service.GenerateServiceToken(roomList: true);
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(token);
+        var videoGrant = jwt.Payload["video"] as System.Text.Json.JsonElement?;
+        videoGrant.Should().NotBeNull();
+        videoGrant!.Value.GetProperty("roomList").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public void GenerateServiceToken_WithRoomAdmin_ContainsGrant()
+    {
+        var service = CreateService();
+
+        var token = service.GenerateServiceToken(roomAdmin: true);
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(token);
+        var videoGrant = jwt.Payload["video"] as System.Text.Json.JsonElement?;
+        videoGrant.Should().NotBeNull();
+        videoGrant!.Value.GetProperty("roomAdmin").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public void GenerateServiceToken_WithMultipleGrants_ContainsAll()
+    {
+        var service = CreateService();
+
+        var token = service.GenerateServiceToken(roomCreate: true, roomList: true, roomAdmin: true);
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(token);
+        var videoGrant = jwt.Payload["video"] as System.Text.Json.JsonElement?;
+        videoGrant.Should().NotBeNull();
+        videoGrant!.Value.GetProperty("roomCreate").GetBoolean().Should().BeTrue();
+        videoGrant.Value.GetProperty("roomList").GetBoolean().Should().BeTrue();
+        videoGrant.Value.GetProperty("roomAdmin").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public void GenerateServiceToken_UsesHmacSha256Algorithm()
+    {
+        var service = CreateService();
+
+        var token = service.GenerateServiceToken(roomCreate: true);
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(token);
+        jwt.Header.Alg.Should().Be("HS256");
+    }
+
+    [Fact]
+    public void GenerateServiceToken_ContainsJtiClaim()
+    {
+        var service = CreateService();
+
+        var token = service.GenerateServiceToken(roomCreate: true);
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(token);
+        jwt.Claims.Should().Contain(c => c.Type == "jti");
+    }
+
+    [Fact]
+    public void GenerateServiceToken_IssuerMatchesApiKey()
+    {
+        var service = CreateService();
+
+        var token = service.GenerateServiceToken(roomCreate: true);
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(token);
+        jwt.Issuer.Should().Be(TestApiKey);
+    }
+
+    // -------------------------------------------------------------------------
+    // CreateRoomAsync – additional coverage
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task CreateRoomAsync_WhenServerReturnsError_ThrowsException()
+    {
+        var handler = CreateMockHandler(HttpStatusCode.InternalServerError, "error");
+        var service = CreateService(handler.Object);
+
+        var act = () => service.CreateRoomAsync("voice-room");
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+    }
+
+    // -------------------------------------------------------------------------
+    // DeleteRoomAsync – additional coverage
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task DeleteRoomAsync_UsesHttpUrlFromWssUrl()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => capturedRequest = req)
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{}")
+            });
+
+        var settings = Options.Create(new LiveKitSettings
+        {
+            ApiKey = TestApiKey,
+            ApiSecret = TestApiSecret,
+            Url = "wss://livekit.example.com"
+        });
+        var service = new LiveKitService(settings, new HttpClient(handler.Object));
+
+        await service.DeleteRoomAsync("voice-room");
+
+        capturedRequest!.RequestUri!.Scheme.Should().Be("https");
+    }
+
+    [Fact]
+    public async Task DeleteRoomAsync_RequestContainsRoomNameInBody()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => capturedRequest = req)
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{}")
+            });
+
+        var service = CreateService(handler.Object);
+
+        await service.DeleteRoomAsync("my-voice-room");
+
+        capturedRequest.Should().NotBeNull();
+        var body = await capturedRequest!.Content!.ReadAsStringAsync();
+        body.Should().Contain("my-voice-room");
+    }
 }
