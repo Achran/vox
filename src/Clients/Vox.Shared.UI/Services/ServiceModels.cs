@@ -15,6 +15,8 @@ public sealed record ChannelResponse(
     Guid ServerId,
     DateTime CreatedAt);
 
+public sealed record OnlineUserInfo(string UserId, string DisplayName);
+
 public sealed record CreateServerRequest(string Name, string? Description);
 public sealed record UpdateServerRequest(string Name, string? Description);
 public sealed record CreateChannelRequest(string Name, string Type);
