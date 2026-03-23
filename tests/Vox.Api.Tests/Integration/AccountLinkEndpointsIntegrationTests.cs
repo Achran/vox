@@ -189,15 +189,6 @@ public sealed class AccountLinkEndpointsIntegrationTests : IClassFixture<AuthWeb
         return tokens!;
     }
 
-    private sealed record AuthTokensResponse(
-        string AccessToken,
-        string RefreshToken,
-        DateTime AccessTokenExpiresAt,
-        string UserId,
-        string Email,
-        string UserName,
-        string DisplayName);
-
     private sealed record LinkedAccountResponse(
         string Provider,
         string ProviderKey,

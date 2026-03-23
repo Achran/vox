@@ -297,15 +297,6 @@ public sealed class AuthEndpointsIntegrationTests : IClassFixture<AuthWebApplica
         return await response.Content.ReadFromJsonAsync<AuthTokensResponse>();
     }
 
-    private sealed record AuthTokensResponse(
-        string AccessToken,
-        string RefreshToken,
-        DateTime AccessTokenExpiresAt,
-        string UserId,
-        string Email,
-        string UserName,
-        string DisplayName);
-
     private sealed record MeResponse(
         string? UserId,
         string? Email,
