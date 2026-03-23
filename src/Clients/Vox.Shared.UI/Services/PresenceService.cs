@@ -137,5 +137,5 @@ public sealed class PresenceService : IPresenceService
         }
     }
 
-    private sealed record PresenceUserDto(string UserId, string? DisplayName, string? Status);
+    private sealed record PresenceUserDto(string UserId, string? Status, string? DisplayName);
 }
