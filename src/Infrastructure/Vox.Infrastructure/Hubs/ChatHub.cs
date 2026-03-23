@@ -15,11 +15,7 @@ public class ChatHub : Hub
 
     public async Task SendMessage(string channelId, string message)
     {
-        var userIdClaim = Context.User?.FindFirst("domain_user_id")?.Value;
-        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var authorId))
-        {
-            throw new HubException("Unauthorized.");
-        }
+        var authorId = GetDomainUserId();
 
         if (!Guid.TryParse(channelId, out var channelGuid))
         {
@@ -40,14 +36,16 @@ public class ChatHub : Hub
 
     public async Task JoinChannel(string channelId)
     {
+        var userId = GetDomainUserId();
         await Groups.AddToGroupAsync(Context.ConnectionId, channelId);
-        await Clients.Group(channelId).SendAsync("UserJoined", Context.UserIdentifier, channelId);
+        await Clients.Group(channelId).SendAsync("UserJoined", userId, channelId);
     }
 
     public async Task LeaveChannel(string channelId)
     {
+        var userId = GetDomainUserId();
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, channelId);
-        await Clients.Group(channelId).SendAsync("UserLeft", Context.UserIdentifier, channelId);
+        await Clients.Group(channelId).SendAsync("UserLeft", userId, channelId);
     }
 
     public override async Task OnConnectedAsync()
@@ -58,5 +56,15 @@ public class ChatHub : Hub
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         await base.OnDisconnectedAsync(exception);
+    }
+
+    private Guid GetDomainUserId()
+    {
+        var claim = Context.User?.FindFirst("domain_user_id")?.Value;
+        if (claim is null || !Guid.TryParse(claim, out var userId))
+        {
+            throw new HubException("Unauthorized.");
+        }
+        return userId;
     }
 }
