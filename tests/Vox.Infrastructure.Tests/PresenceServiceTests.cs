@@ -437,7 +437,7 @@ public class PresenceServiceTests
         // Act
         await _sut.UserDisconnectedAsync("conn1");
 
-        // Assert - disconnected connection is unknown, not stale
+        // Assert - disconnected connection is unknown and treated as stale
         Assert.True(_sut.IsConnectionStale("conn1", TimeSpan.FromSeconds(30)));
         Assert.Empty(_sut.GetStaleConnectionIds(TimeSpan.FromSeconds(0)));
     }

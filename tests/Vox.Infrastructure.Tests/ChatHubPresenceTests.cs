@@ -7,7 +7,7 @@ using Vox.Infrastructure.Hubs;
 
 namespace Vox.Infrastructure.Tests;
 
-public class ChatHubPresenceTests
+public class ChatHubPresenceUnitTests
 {
     private readonly Mock<IMediator> _mediatorMock = new();
     private readonly Mock<IPresenceService> _presenceServiceMock = new();
@@ -19,7 +19,7 @@ public class ChatHubPresenceTests
     private readonly Mock<IClientProxy> _groupClientsMock = new();
     private readonly ChatHub _hub;
 
-    public ChatHubPresenceTests()
+    public ChatHubPresenceUnitTests()
     {
         _clientsMock.Setup(c => c.All).Returns(_allClientsMock.Object);
         _clientsMock.Setup(c => c.Others).Returns(_otherClientsMock.Object);
@@ -82,8 +82,13 @@ public class ChatHubPresenceTests
 
         // Assert
         _otherClientsMock.Verify(
-            c => c.SendCoreAsync("UserOnline",
-                It.Is<object[]>(args => args.Length == 1),
+            c => c.SendCoreAsync(
+                "UserOnline",
+                It.Is<object[]>(args =>
+                    args.Length == 1 &&
+                    args[0] != null &&
+                    Equals(args[0].GetType().GetProperty("UserId")!.GetValue(args[0]), "user1") &&
+                    Equals(args[0].GetType().GetProperty("DisplayName")!.GetValue(args[0]), "TestUser")),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -320,5 +325,8 @@ public class ChatHubPresenceTests
         // Assert
         _groupsMock.Verify(g => g.RemoveFromGroupAsync("conn1", "channel1", It.IsAny<CancellationToken>()), Times.Once);
         _presenceServiceMock.Verify(p => p.UserLeftChannelAsync("conn1", "channel1"), Times.Once);
+        _groupClientsMock.Verify(
+            c => c.SendCoreAsync("UserLeft", It.IsAny<object[]>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }
