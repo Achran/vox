@@ -20,6 +20,10 @@ public sealed class GetOnlineChannelUsersQueryHandler
     {
         var onlineUserIds = _presenceService.GetOnlineUserIdsForChannel(request.ChannelId.ToString());
 
+        if (onlineUserIds is null)
+        {
+            throw new KeyNotFoundException($"Channel with ID '{request.ChannelId}' was not found.");
+        }
         IReadOnlyList<PresenceUserDto> result = onlineUserIds
             .Select(uid => new PresenceUserDto(uid, "Online"))
             .ToList();
