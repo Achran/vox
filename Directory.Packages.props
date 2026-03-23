@@ -34,6 +34,9 @@
     <PackageVersion Include="AspNet.Security.OAuth.GitHub" Version="9.4.1" />
     <PackageVersion Include="AspNet.Security.OpenId.Steam" Version="9.0.0" />
   </ItemGroup>
+  <ItemGroup Label="Blazor Auth">
+    <PackageVersion Include="Microsoft.AspNetCore.Components.Authorization" Version="9.0.5" />
+  </ItemGroup>
   <ItemGroup Label="MudBlazor">
     <PackageVersion Include="MudBlazor" Version="8.6.0" />
   </ItemGroup>

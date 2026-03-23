@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
+using Vox.Shared.UI.Auth;
 using Vox.Web;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
@@ -13,5 +14,6 @@ builder.Services.AddScoped(sp => new HttpClient
 });
 
 builder.Services.AddMudServices();
+builder.Services.AddVoxAuth();
 
 await builder.Build().RunAsync();

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
+using Vox.Shared.UI.Auth;
 
 namespace Vox.Maui;
 
@@ -27,6 +28,8 @@ public static class MauiProgram
         {
             BaseAddress = new Uri("https://localhost:7001")
         });
+
+        builder.Services.AddVoxAuth();
 
         return builder.Build();
     }

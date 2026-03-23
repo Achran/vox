@@ -1,0 +1,146 @@
+@page "/login"
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Login – Vox</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudCard Elevation="4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h5" Align="Align.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-2" />
+                    Sign in to Vox
+                </MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+
+        <MudCardContent>
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+            }
+
+            <MudForm @ref="_form" @bind-IsValid="_formValid">
+                <MudTextField
+                    Label="Email"
+                    @bind-Value="_email"
+                    InputType="InputType.Email"
+                    Required="true"
+                    RequiredError="Email is required."
+                    Adornment="Adornment.Start"
+                    AdornmentIcon="@Icons.Material.Filled.Email"
+                    Class="mb-3" />
+
+                <MudTextField
+                    Label="Password"
+                    @bind-Value="_password"
+                    InputType="@_passwordInputType"
+                    Required="true"
+                    RequiredError="Password is required."
+                    Adornment="Adornment.End"
+                    AdornmentIcon="@_passwordIcon"
+                    OnAdornmentClick="TogglePasswordVisibility"
+                    Class="mb-4" />
+            </MudForm>
+
+            <MudButton
+                Variant="Variant.Filled"
+                Color="Color.Primary"
+                FullWidth="true"
+                OnClick="HandleLogin"
+                Disabled="_loading"
+                Class="mb-4">
+                @if (_loading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Sign In
+            </MudButton>
+
+            <MudDivider Class="mb-4" />
+
+            <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-3">
+                Or sign in with
+            </MudText>
+
+            <MudGrid Spacing="2" Class="mb-4">
+                @foreach (var provider in _externalProviders)
+                {
+                    <MudItem xs="6">
+                        <MudButton
+                            Variant="Variant.Outlined"
+                            Color="Color.Default"
+                            FullWidth="true"
+                            StartIcon="@provider.Icon"
+                            Href="@AuthService.GetExternalLoginUrl(provider.Name)"
+                            Target="_self">
+                            @provider.Name
+                        </MudButton>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudCardContent>
+
+        <MudCardActions Class="justify-center pb-4">
+            <MudText Typo="Typo.body2">
+                Don't have an account?
+                <MudLink Href="/register">Register</MudLink>
+            </MudText>
+        </MudCardActions>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private MudForm _form = default!;
+    private bool _formValid;
+    private bool _loading;
+    private string? _errorMessage;
+
+    private string _email = string.Empty;
+    private string _password = string.Empty;
+
+    private bool _passwordVisible;
+    private InputType _passwordInputType => _passwordVisible ? InputType.Text : InputType.Password;
+    private string _passwordIcon => _passwordVisible
+        ? Icons.Material.Filled.VisibilityOff
+        : Icons.Material.Filled.Visibility;
+
+    private static readonly (string Name, string Icon)[] _externalProviders =
+    [
+        ("Google",    Icons.Custom.Brands.Google),
+        ("Microsoft", Icons.Custom.Brands.Microsoft),
+        ("Facebook",  Icons.Custom.Brands.Facebook),
+        ("Twitter",   Icons.Custom.Brands.Twitter),
+        ("GitHub",    Icons.Custom.Brands.GitHub),
+        ("Steam",     Icons.Material.Filled.SportsEsports),
+    ];
+
+    private void TogglePasswordVisibility() => _passwordVisible = !_passwordVisible;
+
+    private async Task HandleLogin()
+    {
+        await _form.Validate();
+        if (!_formValid) return;
+
+        _loading = true;
+        _errorMessage = null;
+
+        var result = await AuthService.LoginAsync(_email, _password);
+
+        _loading = false;
+
+        if (result is null)
+        {
+            _errorMessage = AuthService.ErrorMessage ?? "Login failed. Please try again.";
+            return;
+        }
+
+        var destination = string.IsNullOrEmpty(ReturnUrl) ? "/" : ReturnUrl;
+        Navigation.NavigateTo(destination);
+    }
+}

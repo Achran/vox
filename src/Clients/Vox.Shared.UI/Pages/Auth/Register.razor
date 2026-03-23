@@ -1,0 +1,174 @@
+@page "/register"
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Register – Vox</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudCard Elevation="4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h5" Align="Align.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
+                    Create an account
+                </MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+
+        <MudCardContent>
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+            }
+
+            <MudForm @ref="_form" @bind-IsValid="_formValid">
+                <MudTextField
+                    Label="Username"
+                    @bind-Value="_userName"
+                    Required="true"
+                    RequiredError="Username is required."
+                    Validation="@(new Func<string, string?>(ValidateUserName))"
+                    Adornment="Adornment.Start"
+                    AdornmentIcon="@Icons.Material.Filled.Person"
+                    Class="mb-3" />
+
+                <MudTextField
+                    Label="Display name"
+                    @bind-Value="_displayName"
+                    Required="true"
+                    RequiredError="Display name is required."
+                    Validation="@(new Func<string, string?>(ValidateDisplayName))"
+                    Adornment="Adornment.Start"
+                    AdornmentIcon="@Icons.Material.Filled.Badge"
+                    Class="mb-3" />
+
+                <MudTextField
+                    Label="Email"
+                    @bind-Value="_email"
+                    InputType="InputType.Email"
+                    Required="true"
+                    RequiredError="Email is required."
+                    Validation="@(new Func<string, string?>(value => string.IsNullOrWhiteSpace(value) || new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(value) ? null : \"Please enter a valid email address.\"))"
+                    Adornment="Adornment.Start"
+                    AdornmentIcon="@Icons.Material.Filled.Email"
+                    Class="mb-3" />
+
+                <MudTextField
+                    Label="Password"
+                    @bind-Value="_password"
+                    InputType="@_passwordInputType"
+                    Required="true"
+                    RequiredError="Password is required."
+                    Validation="@(new Func<string, string?>(ValidatePassword))"
+                    Adornment="Adornment.End"
+                    AdornmentIcon="@_passwordIcon"
+                    OnAdornmentClick="TogglePasswordVisibility"
+                    Class="mb-3" />
+
+                <MudTextField
+                    Label="Confirm password"
+                    @bind-Value="_confirmPassword"
+                    InputType="@_passwordInputType"
+                    Required="true"
+                    RequiredError="Please confirm your password."
+                    Validation="@(new Func<string, string?>(ValidateConfirmPassword))"
+                    Class="mb-4" />
+            </MudForm>
+
+            <MudButton
+                Variant="Variant.Filled"
+                Color="Color.Primary"
+                FullWidth="true"
+                OnClick="HandleRegister"
+                Disabled="_loading">
+                @if (_loading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Register
+            </MudButton>
+        </MudCardContent>
+
+        <MudCardActions Class="justify-center pb-4">
+            <MudText Typo="Typo.body2">
+                Already have an account?
+                <MudLink Href="/login">Sign in</MudLink>
+            </MudText>
+        </MudCardActions>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private MudForm _form = default!;
+    private bool _formValid;
+    private bool _loading;
+    private string? _errorMessage;
+
+    private string _userName = string.Empty;
+    private string _displayName = string.Empty;
+    private string _email = string.Empty;
+    private string _password = string.Empty;
+    private string _confirmPassword = string.Empty;
+
+    private bool _passwordVisible;
+    private InputType _passwordInputType => _passwordVisible ? InputType.Text : InputType.Password;
+    private string _passwordIcon => _passwordVisible
+        ? Icons.Material.Filled.VisibilityOff
+        : Icons.Material.Filled.Visibility;
+
+    private void TogglePasswordVisibility() => _passwordVisible = !_passwordVisible;
+
+    private static string? ValidateUserName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "Username is required.";
+        if (value.Length < 3) return "Username must be at least 3 characters.";
+        if (value.Length > 32) return "Username must not exceed 32 characters.";
+        if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"^[a-zA-Z0-9_.\-]+$"))
+            return "Username may only contain letters, digits, underscores, dots, and hyphens.";
+        return null;
+    }
+
+    private static string? ValidateDisplayName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "Display name is required.";
+        if (value.Length > 64) return "Display name must not exceed 64 characters.";
+        return null;
+    }
+
+    private static string? ValidatePassword(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "Password is required.";
+        if (value.Length < 8) return "Password must be at least 8 characters.";
+        if (!value.Any(char.IsUpper)) return "Password must contain at least one uppercase letter.";
+        if (!value.Any(char.IsLower)) return "Password must contain at least one lowercase letter.";
+        if (!value.Any(char.IsDigit)) return "Password must contain at least one digit.";
+        return null;
+    }
+
+    private string? ValidateConfirmPassword(string value)
+    {
+        if (value != _password) return "Passwords do not match.";
+        return null;
+    }
+
+    private async Task HandleRegister()
+    {
+        await _form.Validate();
+        if (!_formValid) return;
+
+        _loading = true;
+        _errorMessage = null;
+
+        var result = await AuthService.RegisterAsync(_userName, _email, _displayName, _password);
+
+        _loading = false;
+
+        if (result is null)
+        {
+            _errorMessage = AuthService.ErrorMessage ?? "Registration failed. Please try again.";
+            return;
+        }
+
+        Navigation.NavigateTo("/");
+    }
+}
