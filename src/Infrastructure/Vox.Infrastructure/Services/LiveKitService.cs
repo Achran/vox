@@ -67,7 +67,7 @@ public sealed class LiveKitService : ILiveKitService
         var request = CreateTwirpRequest("livekit.RoomService/CreateRoom", token);
         request.Content = JsonContent.Create(new { name = roomName });
 
-        var response = await _httpClient.SendAsync(request, cancellationToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return roomName;
@@ -79,7 +79,7 @@ public sealed class LiveKitService : ILiveKitService
         var request = CreateTwirpRequest("livekit.RoomService/DeleteRoom", token);
         request.Content = JsonContent.Create(new { room = roomName });
 
-        var response = await _httpClient.SendAsync(request, cancellationToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -125,12 +125,21 @@ public sealed class LiveKitService : ILiveKitService
 
     private HttpRequestMessage CreateTwirpRequest(string method, string token)
     {
-        // LiveKit Twirp API uses the HTTP URL, not the WebSocket URL
-        var httpUrl = _settings.Url
-            .Replace("ws://", "http://")
-            .Replace("wss://", "https://");
+        if (string.IsNullOrWhiteSpace(_settings.Url))
+            throw new InvalidOperationException("LiveKit:Url is not configured.");
 
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{httpUrl.TrimEnd('/')}/twirp/{method}");
+        // LiveKit Twirp API uses the HTTP URL, not the WebSocket URL
+        var uri = new Uri(_settings.Url);
+        var httpScheme = uri.Scheme switch
+        {
+            "wss" => "https",
+            "ws" => "http",
+            _ => uri.Scheme
+        };
+        var builder = new UriBuilder(uri) { Scheme = httpScheme };
+        var httpUrl = builder.Uri.GetLeftPart(UriPartial.Authority);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{httpUrl}/twirp/{method}");
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         return request;
     }

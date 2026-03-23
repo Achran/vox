@@ -52,28 +52,26 @@ public static class VoiceEndpoints
     private static async Task<IResult> CreateRoomAsync(
         Guid channelId, HttpContext httpContext, ILiveKitService liveKitService)
     {
-        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userId is null)
+        if (httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value is null)
         {
             return Results.Unauthorized();
         }
 
         var roomName = $"voice-{channelId}";
-        var created = await liveKitService.CreateRoomAsync(roomName);
+        var created = await liveKitService.CreateRoomAsync(roomName, httpContext.RequestAborted);
         return Results.Ok(new { Room = created });
     }
 
     private static async Task<IResult> DeleteRoomAsync(
         Guid channelId, HttpContext httpContext, ILiveKitService liveKitService)
     {
-        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userId is null)
+        if (httpContext.User.FindFirst(ClaimTypes.NameIdentifier) is null)
         {
             return Results.Unauthorized();
         }
 
         var roomName = $"voice-{channelId}";
-        await liveKitService.DeleteRoomAsync(roomName);
+        await liveKitService.DeleteRoomAsync(roomName, httpContext.RequestAborted);
         return Results.NoContent();
     }
 }

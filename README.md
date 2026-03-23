@@ -132,7 +132,7 @@ This starts:
 - **Redis 7** on port `6379`
 - **LiveKit Server** on ports `7880` (HTTP), `7881` (RTC), `7882/udp` (WebRTC)
 
-LiveKit is pre-configured with API key `devkey` and secret `secret` (see `livekit.yaml`).
+LiveKit is pre-configured with API key `devkey` and secret `secret` for **local development only** (see `livekit.yaml`). **Do not use these credentials in any production or deployed environment**—generate and configure your own secure API key and secret for deployments.
 
 Alternatively, start only PostgreSQL:
 
