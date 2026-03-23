@@ -17,10 +17,11 @@ public static class MessageEndpoints
     }
 
     private static async Task<IResult> GetChannelMessagesAsync(
-        Guid channelId, int? pageSize, DateTime? before, IMediator mediator, CancellationToken ct)
+        Guid channelId, int? pageSize, DateTimeOffset? before, IMediator mediator, CancellationToken ct)
     {
+        var beforeUtc = before?.UtcDateTime;
         var result = await mediator.Send(
-            new GetChannelMessagesQuery(channelId, pageSize ?? 50, before), ct);
+            new GetChannelMessagesQuery(channelId, pageSize ?? 50, beforeUtc), ct);
         return Results.Ok(result);
     }
 }
