@@ -1,0 +1,166 @@
+@page "/profile"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Profile – Vox</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-6">
+    <MudText Typo="Typo.h4" GutterBottom="true">
+        <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Class="mr-2" />
+        Profile settings
+    </MudText>
+
+    <MudCard Elevation="2" Class="mb-6">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Account info</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <AuthorizeView>
+                <Authorized>
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Username</MudText>
+                            <MudText>@GetClaim(context.User, "unique_name")</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Display name</MudText>
+                            <MudText>@GetClaim(context.User, "display_name")</MudText>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Email</MudText>
+                            <MudText>@GetClaim(context.User, "email")</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </Authorized>
+            </AuthorizeView>
+        </MudCardContent>
+    </MudCard>
+
+    <MudCard Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Linked accounts</MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                               OnClick="LoadProvidersAsync"
+                               Disabled="_loading" />
+            </CardHeaderActions>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Class="mb-4">
+                    Link external accounts to sign in without a password.
+                </MudText>
+
+                <MudGrid Spacing="2">
+                    @foreach (var provider in _allProviders)
+                    {
+                        var linked = _linkedProviders.FirstOrDefault(p =>
+                            string.Equals(p.Provider, provider.Name, StringComparison.OrdinalIgnoreCase));
+
+                        <MudItem xs="12" sm="6">
+                            <MudPaper Outlined="true" Class="pa-3 d-flex align-center justify-space-between">
+                                <div class="d-flex align-center gap-2">
+                                    <MudIcon Icon="@provider.Icon" />
+                                    <MudText>@provider.Name</MudText>
+                                </div>
+                                @if (linked is not null)
+                                {
+                                    <MudButton
+                                        Variant="Variant.Text"
+                                        Color="Color.Error"
+                                        Size="Size.Small"
+                                        StartIcon="@Icons.Material.Filled.LinkOff"
+                                        OnClick="@(() => UnlinkAsync(provider.Name))"
+                                        Disabled="_unlinkingProvider == provider.Name">
+                                        Unlink
+                                    </MudButton>
+                                }
+                                else
+                                {
+                                    <MudButton
+                                        Variant="Variant.Text"
+                                        Color="Color.Primary"
+                                        Size="Size.Small"
+                                        StartIcon="@Icons.Material.Filled.Link"
+                                        Href="@AuthService.GetExternalLoginUrl(provider.Name)"
+                                        Target="_self">
+                                        Link
+                                    </MudButton>
+                                }
+                            </MudPaper>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private bool _loading;
+    private string? _errorMessage;
+    private string? _unlinkingProvider;
+    private IReadOnlyList<LinkedAccountResponse> _linkedProviders = [];
+
+    private static readonly (string Name, string Icon)[] _allProviders =
+    [
+        ("Google",    Icons.Custom.Brands.Google),
+        ("Microsoft", Icons.Custom.Brands.Microsoft),
+        ("Facebook",  Icons.Custom.Brands.Facebook),
+        ("Twitter",   Icons.Custom.Brands.Twitter),
+        ("GitHub",    Icons.Custom.Brands.GitHub),
+        ("Steam",     Icons.Material.Filled.SportsEsports),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProvidersAsync();
+    }
+
+    private async Task LoadProvidersAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        _linkedProviders = await AuthService.GetLinkedProvidersAsync();
+        if (_linkedProviders.Count == 0 && AuthService.ErrorMessage is not null)
+            _errorMessage = AuthService.ErrorMessage;
+
+        _loading = false;
+    }
+
+    private async Task UnlinkAsync(string provider)
+    {
+        _unlinkingProvider = provider;
+        var success = await AuthService.UnlinkProviderAsync(provider);
+        _unlinkingProvider = null;
+
+        if (success)
+        {
+            Snackbar.Add($"{provider} account unlinked.", Severity.Success);
+            await LoadProvidersAsync();
+        }
+        else
+        {
+            Snackbar.Add(AuthService.ErrorMessage ?? "Could not unlink account.", Severity.Error);
+        }
+    }
+
+    private static string GetClaim(System.Security.Claims.ClaimsPrincipal user, string claimType)
+        => user.FindFirst(claimType)?.Value ?? "-";
+}

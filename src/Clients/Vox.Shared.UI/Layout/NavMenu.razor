@@ -11,4 +11,19 @@
     <MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Settings">
         Settings
     </MudNavLink>
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/profile" Icon="@Icons.Material.Filled.AccountCircle">
+                Profile
+            </MudNavLink>
+        </Authorized>
+        <NotAuthorized>
+            <MudNavLink Href="/login" Icon="@Icons.Material.Filled.Login">
+                Sign in
+            </MudNavLink>
+            <MudNavLink Href="/register" Icon="@Icons.Material.Filled.PersonAdd">
+                Register
+            </MudNavLink>
+        </NotAuthorized>
+    </AuthorizeView>
 </MudNavMenu>
