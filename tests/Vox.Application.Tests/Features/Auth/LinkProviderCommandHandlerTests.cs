@@ -52,6 +52,7 @@ public class LinkProviderCommandHandlerTests
         var act = () => _handler.Handle(command, CancellationToken.None);
 
         // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("A login for this provider already exists.");
     }
 }
