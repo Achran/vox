@@ -138,7 +138,22 @@ public sealed class VoiceEndpointsIntegrationTests : IClassFixture<AuthWebApplic
         var body1 = await response1.Content.ReadFromJsonAsync<VoiceTokenResponse>();
         var body2 = await response2.Content.ReadFromJsonAsync<VoiceTokenResponse>();
 
+        // Tokens should be different (e.g., due to different channel or unique claims)
         body1!.Token.Should().NotBe(body2!.Token);
+
+        // Additionally, verify that each token's video.room claim matches its channel ID
+        var handler = new JwtSecurityTokenHandler();
+        var jwt1 = handler.ReadJwtToken(body1.Token);
+        var jwt2 = handler.ReadJwtToken(body2.Token);
+
+        var videoGrant1 = jwt1.Payload["video"] as System.Text.Json.JsonElement?;
+        var videoGrant2 = jwt2.Payload["video"] as System.Text.Json.JsonElement?;
+
+        videoGrant1.Should().NotBeNull();
+        videoGrant2.Should().NotBeNull();
+
+        videoGrant1!.Value.GetProperty("room").GetString().Should().Be($"voice-{channelId1}");
+        videoGrant2!.Value.GetProperty("room").GetString().Should().Be($"voice-{channelId2}");
     }
 
     [Fact]

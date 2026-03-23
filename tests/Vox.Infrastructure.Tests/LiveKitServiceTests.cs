@@ -327,6 +327,13 @@ public class LiveKitServiceTests
         var token2 = service.GenerateToken("user-2", "User Two", "voice-room");
 
         token1.Should().NotBe(token2);
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt1 = handler.ReadJwtToken(token1);
+        var jwt2 = handler.ReadJwtToken(token2);
+
+        jwt1.Subject.Should().Be("user-1");
+        jwt2.Subject.Should().Be("user-2");
     }
 
     // -------------------------------------------------------------------------
