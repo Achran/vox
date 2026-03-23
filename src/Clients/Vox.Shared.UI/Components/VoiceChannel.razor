@@ -1,0 +1,236 @@
+@implements IDisposable
+@inject IVoiceService VoiceService
+@inject IPresenceService PresenceService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="d-flex flex-column align-center justify-center pa-4" style="flex: 1;">
+    @if (!_joined)
+    {
+        <MudIcon Icon="@Icons.Material.Filled.VolumeUp" Size="Size.Large" Color="Color.Secondary" />
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">
+            Voice channel — click below to connect.
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Call"
+                   OnClick="JoinAsync"
+                   Disabled="@_connecting"
+                   Class="mt-4">
+            @if (_connecting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                @:Connecting…
+            }
+            else
+            {
+                @:Join Voice
+            }
+        </MudButton>
+    }
+    else
+    {
+        <div style="width: 100%; max-width: 480px;">
+            @* Toolbar: mute + disconnect *@
+            <div class="d-flex align-center justify-center gap-3 mb-4">
+                <MudTooltip Text="@(VoiceService.IsMuted ? "Unmute" : "Mute")">
+                    <MudIconButton Icon="@(_muteIcon)"
+                                   Color="@(VoiceService.IsMuted ? Color.Error : Color.Default)"
+                                   Variant="Variant.Filled"
+                                   Size="Size.Large"
+                                   OnClick="ToggleMute" />
+                </MudTooltip>
+                <MudTooltip Text="Disconnect">
+                    <MudIconButton Icon="@Icons.Material.Filled.CallEnd"
+                                   Color="Color.Error"
+                                   Variant="Variant.Filled"
+                                   Size="Size.Large"
+                                   OnClick="LeaveAsync" />
+                </MudTooltip>
+            </div>
+
+            @* Participant list *@
+            <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mb-2">
+                PARTICIPANTS — @VoiceService.Participants.Count
+            </MudText>
+
+            @if (VoiceService.Participants.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Class="pa-4">
+                    Waiting for others to join…
+                </MudText>
+            }
+            else
+            {
+                @foreach (var userId in VoiceService.Participants)
+                {
+                    var displayName = GetDisplayName(userId);
+                    var isSpeaking = !IsMutedUser(userId);
+
+                    <div class="d-flex align-center gap-3 pa-2 rounded mb-1"
+                         style="background-color: var(--mud-palette-background-gray);">
+                        @* Speaking indicator ring *@
+                        <div style="position: relative;">
+                            <MudAvatar Size="Size.Medium"
+                                       Color="@(isSpeaking ? Color.Success : Color.Dark)"
+                                       Style="@(isSpeaking ? "box-shadow: 0 0 0 3px var(--mud-palette-success);" : "")">
+                                @GetInitials(displayName)
+                            </MudAvatar>
+                        </div>
+
+                        <div class="flex-grow-1" style="min-width: 0;">
+                            <MudText Typo="Typo.body2" Class="mud-text-truncate">
+                                @displayName
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @(IsMutedUser(userId) ? "Muted" : "Connected")
+                            </MudText>
+                        </div>
+
+                        @* Volume level indicator *@
+                        <div class="d-flex align-center gap-1" style="min-width: 48px;">
+                            @if (isSpeaking)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Mic"
+                                         Size="Size.Small"
+                                         Color="Color.Success" />
+                                <div style="width: 32px; height: 6px; border-radius: 3px; background-color: var(--mud-palette-lines-default); overflow: hidden;">
+                                    <div style="width: 60%; height: 100%; border-radius: 3px; background-color: var(--mud-palette-success); transition: width 0.15s ease;"></div>
+                                </div>
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.MicOff"
+                                         Size="Size.Small"
+                                         Color="Color.Secondary" />
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid ChannelId { get; set; }
+
+    [Parameter]
+    public string ChannelName { get; set; } = "";
+
+    private bool _joined;
+    private bool _connecting;
+    private Guid _currentChannelId;
+    private string? _currentUserId;
+
+    private string _muteIcon => VoiceService.IsMuted
+        ? Icons.Material.Filled.MicOff
+        : Icons.Material.Filled.Mic;
+
+    protected override async Task OnInitializedAsync()
+    {
+        VoiceService.StateChanged += OnStateChanged;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        _currentUserId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                      ?? authState.User.FindFirst("sub")?.Value;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_currentChannelId == ChannelId)
+            return;
+
+        // If switching channels while connected, leave the old one
+        if (_joined && _currentChannelId != Guid.Empty)
+        {
+            try
+            {
+                await VoiceService.LeaveChannelAsync(_currentChannelId.ToString());
+            }
+            catch
+            {
+                // Ignore errors when leaving channels
+            }
+            _joined = false;
+        }
+
+        _currentChannelId = ChannelId;
+
+        // Check if already in this channel
+        _joined = VoiceService.CurrentChannelId == ChannelId.ToString();
+    }
+
+    private async Task JoinAsync()
+    {
+        _connecting = true;
+        StateHasChanged();
+
+        try
+        {
+            await VoiceService.ConnectAsync();
+            await VoiceService.JoinChannelAsync(ChannelId.ToString());
+            _joined = true;
+        }
+        catch
+        {
+            _joined = false;
+        }
+        finally
+        {
+            _connecting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LeaveAsync()
+    {
+        try
+        {
+            await VoiceService.LeaveChannelAsync(ChannelId.ToString());
+        }
+        catch
+        {
+            // Ignore errors when leaving
+        }
+        finally
+        {
+            _joined = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleMute()
+    {
+        VoiceService.ToggleMute();
+    }
+
+    private bool IsMutedUser(string userId)
+    {
+        return userId == _currentUserId && VoiceService.IsMuted;
+    }
+
+    private string GetDisplayName(string userId)
+    {
+        var onlineUser = PresenceService.OnlineUsers.FirstOrDefault(u => u.UserId == userId);
+        return onlineUser?.DisplayName ?? userId;
+    }
+
+    private static string GetInitials(string name)
+    {
+        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length == 0) return "?";
+        if (words.Length == 1) return words[0][..Math.Min(2, words[0].Length)].ToUpperInvariant();
+        return $"{char.ToUpperInvariant(words[0][0])}{char.ToUpperInvariant(words[1][0])}";
+    }
+
+    private void OnStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        VoiceService.StateChanged -= OnStateChanged;
+    }
+}
