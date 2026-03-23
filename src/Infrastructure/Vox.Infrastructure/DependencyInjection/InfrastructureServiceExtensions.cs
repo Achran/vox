@@ -100,10 +100,8 @@ public static class InfrastructureServiceExtensions
 
         AddExternalProviders(authBuilder, externalSection);
 
-        services.AddSignalR(options =>
-        {
-            options.AddFilter<Hubs.ChatRateLimitFilter>();
-        });
+        services.AddSignalR();
+        services.AddSingleton<IHubFilter, Hubs.ChatRateLimitFilter>();
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IIdentityService, IdentityService>();

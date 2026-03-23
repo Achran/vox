@@ -10,7 +10,7 @@ public class ChatRateLimitFilter : IHubFilter
     private const int PermitLimit = 10;
     private static readonly TimeSpan Window = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan CleanupThreshold = TimeSpan.FromSeconds(30);
-    private DateTime _lastCleanup = DateTime.UtcNow;
+    private long _lastCleanupTicks = DateTime.UtcNow.Ticks;
 
     public async ValueTask<object?> InvokeMethodAsync(
         HubInvocationContext invocationContext,
@@ -48,16 +48,22 @@ public class ChatRateLimitFilter : IHubFilter
 
     private void CleanupStaleEntries(DateTime now)
     {
-        if (now - _lastCleanup < CleanupThreshold)
+        var lastTicks = Interlocked.Read(ref _lastCleanupTicks);
+        if (now.Ticks - lastTicks < CleanupThreshold.Ticks)
             return;
 
-        _lastCleanup = now;
+        if (Interlocked.CompareExchange(ref _lastCleanupTicks, now.Ticks, lastTicks) != lastTicks)
+            return;
 
         foreach (var kvp in _rates)
         {
-            if (now - kvp.Value.WindowStart >= CleanupThreshold)
+            var state = kvp.Value;
+            lock (state)
             {
-                _rates.TryRemove(kvp.Key, out _);
+                if (now - state.WindowStart >= CleanupThreshold)
+                {
+                    _rates.TryRemove(kvp.Key, out _);
+                }
             }
         }
     }
