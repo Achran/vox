@@ -598,4 +598,83 @@ public class VoiceHubTests
             c => c.SendCoreAsync("ReceiveIceCandidate", It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
+
+    // -------------------------------------------------------------------------
+    // UpdateMuteState
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task UpdateMuteState_WhenInChannel_BroadcastsToOthers()
+    {
+        // Arrange
+        var userId = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(userId);
+
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, userId)).Returns(true);
+        _clientsMock.Setup(c => c.OthersInGroup($"voice:{channelId}")).Returns(_othersInGroupProxyMock.Object);
+
+        // Act
+        await _hub.UpdateMuteState(channelId, true);
+
+        // Assert
+        _othersInGroupProxyMock.Verify(
+            c => c.SendCoreAsync("UserMuteStateChanged",
+                It.Is<object?[]>(args => args.Length == 3
+                    && (string)args[0]! == userId
+                    && (string)args[1]! == channelId
+                    && (bool)args[2]! == true),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateMuteState_Unmute_BroadcastsFalse()
+    {
+        // Arrange
+        var userId = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(userId);
+
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, userId)).Returns(true);
+        _clientsMock.Setup(c => c.OthersInGroup($"voice:{channelId}")).Returns(_othersInGroupProxyMock.Object);
+
+        // Act
+        await _hub.UpdateMuteState(channelId, false);
+
+        // Assert
+        _othersInGroupProxyMock.Verify(
+            c => c.SendCoreAsync("UserMuteStateChanged",
+                It.Is<object?[]>(args => args.Length == 3 && (bool)args[2]! == false),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateMuteState_NotInChannel_ThrowsHubException()
+    {
+        // Arrange
+        var userId = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(userId);
+
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, userId)).Returns(false);
+
+        // Act & Assert
+        var act = () => _hub.UpdateMuteState(channelId, true);
+        await act.Should().ThrowAsync<HubException>()
+            .WithMessage("You are not in this voice channel.");
+    }
+
+    [Fact]
+    public async Task UpdateMuteState_NoAuth_ThrowsHubException()
+    {
+        // Arrange – no authenticated user
+        _contextMock.Setup(c => c.UserIdentifier).Returns((string?)null);
+
+        // Act & Assert
+        var act = () => _hub.UpdateMuteState("channel-1", true);
+        await act.Should().ThrowAsync<HubException>()
+            .WithMessage("Unauthorized.");
+    }
 }

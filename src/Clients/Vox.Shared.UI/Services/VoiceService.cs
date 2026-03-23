@@ -1,4 +1,6 @@
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.JSInterop;
 using Vox.Shared.UI.Auth;
 
 namespace Vox.Shared.UI.Services;
@@ -6,10 +8,16 @@ namespace Vox.Shared.UI.Services;
 public sealed class VoiceService : IVoiceService
 {
     private readonly ITokenStorageService _tokenStorage;
+    private readonly HttpClient _http;
+    private readonly IJSRuntime _jsRuntime;
     private readonly Uri _hubUrl;
     private HubConnection? _hubConnection;
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<VoiceService>? _dotNetRef;
     private readonly object _lock = new();
     private List<string> _participants = [];
+    private HashSet<string> _activeSpeakers = [];
+    private Dictionary<string, bool> _participantMuteStates = [];
 
     public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
     public string? CurrentChannelId { get; private set; }
@@ -19,14 +27,26 @@ public sealed class VoiceService : IVoiceService
     }
     public bool IsMuted { get; private set; }
 
+    public IReadOnlySet<string> ActiveSpeakers
+    {
+        get { lock (_lock) { return new HashSet<string>(_activeSpeakers); } }
+    }
+
+    public IReadOnlyDictionary<string, bool> ParticipantMuteStates
+    {
+        get { lock (_lock) { return new Dictionary<string, bool>(_participantMuteStates); } }
+    }
+
     public event Action<string, string>? UserJoined;
     public event Action<string, string>? UserLeft;
     public event Action<string, IReadOnlyList<string>>? ParticipantsUpdated;
     public event Action? StateChanged;
 
-    public VoiceService(HttpClient http, ITokenStorageService tokenStorage)
+    public VoiceService(HttpClient http, ITokenStorageService tokenStorage, IJSRuntime jsRuntime)
     {
         _tokenStorage = tokenStorage;
+        _http = http;
+        _jsRuntime = jsRuntime;
 
         if (http.BaseAddress is null)
         {
@@ -72,6 +92,8 @@ public sealed class VoiceService : IVoiceService
             lock (_lock)
             {
                 _participants.Remove(userId);
+                _activeSpeakers.Remove(userId);
+                _participantMuteStates.Remove(userId);
             }
             UserLeft?.Invoke(userId, channelId);
             StateChanged?.Invoke();
@@ -84,6 +106,15 @@ public sealed class VoiceService : IVoiceService
                 _participants = participants.ToList();
             }
             ParticipantsUpdated?.Invoke(channelId, participants);
+            StateChanged?.Invoke();
+        });
+
+        _hubConnection.On<string, string, bool>("UserMuteStateChanged", (userId, channelId, isMuted) =>
+        {
+            lock (_lock)
+            {
+                _participantMuteStates[userId] = isMuted;
+            }
             StateChanged?.Invoke();
         });
 
@@ -127,6 +158,9 @@ public sealed class VoiceService : IVoiceService
             throw;
         }
 
+        // Connect to the LiveKit room for actual audio
+        await ConnectLiveKitAsync(channelId);
+
         StateChanged?.Invoke();
     }
 
@@ -134,6 +168,9 @@ public sealed class VoiceService : IVoiceService
     {
         if (CurrentChannelId != channelId)
             return;
+
+        // Disconnect from LiveKit first
+        await DisconnectLiveKitAsync();
 
         if (IsConnected)
         {
@@ -144,6 +181,8 @@ public sealed class VoiceService : IVoiceService
         lock (_lock)
         {
             _participants = [];
+            _activeSpeakers = [];
+            _participantMuteStates = [];
         }
         IsMuted = false;
         StateChanged?.Invoke();
@@ -152,8 +191,142 @@ public sealed class VoiceService : IVoiceService
     public void ToggleMute()
     {
         IsMuted = !IsMuted;
+        _ = SetMicrophoneEnabledAsync(!IsMuted);
+        _ = BroadcastMuteStateAsync();
         StateChanged?.Invoke();
     }
+
+    // ------------------------------------------------------------------
+    // LiveKit integration via JS interop
+    // ------------------------------------------------------------------
+
+    private async Task ConnectLiveKitAsync(string channelId)
+    {
+        try
+        {
+            var tokenResponse = await _http.GetFromJsonAsync<LiveKitTokenResponse>(
+                $"api/voice/token/{channelId}");
+
+            if (tokenResponse is null)
+                return;
+
+            var module = await GetJsModuleAsync();
+            if (module is null)
+                return;
+
+            _dotNetRef ??= DotNetObjectReference.Create(this);
+
+            await module.InvokeAsync<bool>(
+                "connect", tokenResponse.Url, tokenResponse.Token, _dotNetRef);
+        }
+        catch
+        {
+            // LiveKit connection is best-effort; presence via SignalR still works.
+        }
+    }
+
+    private async Task DisconnectLiveKitAsync()
+    {
+        try
+        {
+            var module = await GetJsModuleAsync();
+            if (module is not null)
+            {
+                await module.InvokeVoidAsync("disconnect");
+            }
+        }
+        catch
+        {
+            // Ignore errors during cleanup
+        }
+    }
+
+    private async Task SetMicrophoneEnabledAsync(bool enabled)
+    {
+        try
+        {
+            var module = await GetJsModuleAsync();
+            if (module is not null)
+            {
+                await module.InvokeVoidAsync("setMicrophoneEnabled", enabled);
+            }
+        }
+        catch
+        {
+            // Ignore errors – mute state is still tracked locally
+        }
+    }
+
+    private async Task BroadcastMuteStateAsync()
+    {
+        try
+        {
+            if (IsConnected && CurrentChannelId is not null)
+            {
+                await _hubConnection!.InvokeAsync("UpdateMuteState", CurrentChannelId, IsMuted);
+            }
+        }
+        catch
+        {
+            // Best-effort broadcast
+        }
+    }
+
+    private async Task<IJSObjectReference?> GetJsModuleAsync()
+    {
+        if (_jsModule is not null)
+            return _jsModule;
+
+        try
+        {
+            _jsModule = await _jsRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/Vox.Shared.UI/voiceInterop.js");
+        }
+        catch
+        {
+            // JS interop may not be available (e.g., pre-rendering)
+        }
+
+        return _jsModule;
+    }
+
+    // ------------------------------------------------------------------
+    // JSInvokable callbacks from voiceInterop.js
+    // ------------------------------------------------------------------
+
+    [JSInvokable]
+    public void OnActiveSpeakersChanged(string[] speakerIds)
+    {
+        lock (_lock)
+        {
+            _activeSpeakers = new HashSet<string>(speakerIds);
+        }
+        StateChanged?.Invoke();
+    }
+
+    [JSInvokable]
+    public void OnParticipantMuteChanged(string participantId, bool isMuted)
+    {
+        lock (_lock)
+        {
+            _participantMuteStates[participantId] = isMuted;
+        }
+        StateChanged?.Invoke();
+    }
+
+    [JSInvokable]
+    public void OnLiveKitDisconnected()
+    {
+        lock (_lock)
+        {
+            _activeSpeakers = [];
+        }
+        StateChanged?.Invoke();
+    }
+
+    // ------------------------------------------------------------------
+    // Disposal
+    // ------------------------------------------------------------------
 
     public async ValueTask DisposeAsync()
     {
@@ -163,6 +336,7 @@ public sealed class VoiceService : IVoiceService
             {
                 try
                 {
+                    await DisconnectLiveKitAsync();
                     await _hubConnection.InvokeAsync("LeaveVoiceChannel", CurrentChannelId);
                 }
                 catch
@@ -173,5 +347,21 @@ public sealed class VoiceService : IVoiceService
 
             await _hubConnection.DisposeAsync();
         }
+
+        if (_jsModule is not null)
+        {
+            try
+            {
+                await _jsModule.DisposeAsync();
+            }
+            catch
+            {
+                // Ignore errors during disposal
+            }
+        }
+
+        _dotNetRef?.Dispose();
     }
+
+    private sealed record LiveKitTokenResponse(string Token, string Url);
 }

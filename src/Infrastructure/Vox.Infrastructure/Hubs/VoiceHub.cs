@@ -80,6 +80,20 @@ public class VoiceHub : Hub
         await Clients.User(targetUserId).SendAsync("ReceiveIceCandidate", senderId, channelId, candidate);
     }
 
+    /// <summary>Broadcast mute state to other participants in the voice channel.</summary>
+    public async Task UpdateMuteState(string channelId, bool isMuted)
+    {
+        var userId = GetUserId();
+
+        if (!_voiceSessionService.IsUserInVoiceChannel(channelId, userId))
+        {
+            throw new HubException("You are not in this voice channel.");
+        }
+
+        await Clients.OthersInGroup($"voice:{channelId}")
+            .SendAsync("UserMuteStateChanged", userId, channelId, isMuted);
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         var userId = Context.UserIdentifier;
