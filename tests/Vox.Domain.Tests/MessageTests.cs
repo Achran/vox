@@ -71,4 +71,41 @@ public class MessageTests
         // Assert
         Assert.True(message.IsDeleted);
     }
+
+    [Fact]
+    public void Create_WithNullContent_ThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            Message.Create(Guid.NewGuid(), Guid.NewGuid(), null!));
+    }
+
+    [Fact]
+    public void Edit_WithNullContent_ThrowsArgumentException()
+    {
+        var message = Message.Create(Guid.NewGuid(), Guid.NewGuid(), "Original");
+        Assert.Throws<ArgumentNullException>(() => message.Edit(null!));
+    }
+
+    [Fact]
+    public void Edit_WithWhitespaceContent_ThrowsArgumentException()
+    {
+        var message = Message.Create(Guid.NewGuid(), Guid.NewGuid(), "Original");
+        Assert.Throws<ArgumentException>(() => message.Edit("   "));
+    }
+
+    [Fact]
+    public void Edit_DoesNotChangeIsDeleted()
+    {
+        var message = Message.Create(Guid.NewGuid(), Guid.NewGuid(), "Original");
+        message.Edit("Updated");
+        Assert.False(message.IsDeleted);
+    }
+
+    [Fact]
+    public void Delete_DoesNotChangeContent()
+    {
+        var message = Message.Create(Guid.NewGuid(), Guid.NewGuid(), "Keep me");
+        message.Delete();
+        Assert.Equal("Keep me", message.Content);
+    }
 }
