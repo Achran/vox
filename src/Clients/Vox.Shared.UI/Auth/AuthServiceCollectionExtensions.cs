@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using Vox.Shared.UI.Services;
 
 namespace Vox.Shared.UI.Auth;
 
@@ -7,7 +8,7 @@ public static class AuthServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the Vox auth services (token storage, auth service, state provider)
-    /// for use in both Blazor WebAssembly and MAUI Hybrid clients.
+    /// and application services for use in both Blazor WebAssembly and MAUI Hybrid clients.
     /// </summary>
     public static IServiceCollection AddVoxAuth(this IServiceCollection services)
     {
@@ -17,6 +18,8 @@ public static class AuthServiceCollectionExtensions
         services.AddScoped<AuthenticationStateProvider>(sp =>
             sp.GetRequiredService<VoxAuthenticationStateProvider>());
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IServerService, ServerService>();
+        services.AddScoped<IChannelService, ChannelService>();
 
         return services;
     }

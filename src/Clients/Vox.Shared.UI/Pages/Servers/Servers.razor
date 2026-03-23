@@ -1,0 +1,143 @@
+@page "/servers"
+@page "/servers/{ServerId:guid}"
+@page "/servers/{ServerId:guid}/channels/{ChannelId:guid}"
+@attribute [Authorize]
+@inject IServerService ServerService
+@inject NavigationManager Navigation
+
+<PageTitle>Servers - Vox</PageTitle>
+
+<div style="display: flex; height: calc(100vh - 120px); margin: -16px;">
+    <ServerSidebar @ref="_serverSidebar"
+                   SelectedServerId="@_selectedServer?.Id"
+                   OnServerSelected="OnServerSelectedAsync"
+                   OnServersChanged="OnServersChangedAsync" />
+
+    <ChannelList @ref="_channelList"
+                 Server="@_selectedServer"
+                 SelectedChannelId="@_selectedChannel?.Id"
+                 OnChannelSelected="OnChannelSelectedAsync"
+                 OnChannelsChanged="StateHasChanged"
+                 OnServerUpdated="OnServerUpdatedAsync"
+                 OnServerDeleted="OnServerDeletedAsync" />
+
+    <div class="flex-grow-1 pa-4" style="overflow-y: auto;">
+        @if (_selectedChannel is not null)
+        {
+            <div class="d-flex align-center mb-4">
+                @if (_selectedChannel.Type.Equals("Text", StringComparison.OrdinalIgnoreCase))
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Tag" Class="mr-2" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.VolumeUp" Class="mr-2" />
+                }
+                <MudText Typo="Typo.h5">@_selectedChannel.Name</MudText>
+            </div>
+            <MudText Typo="Typo.body1" Color="Color.Secondary">
+                @if (_selectedChannel.Type.Equals("Voice", StringComparison.OrdinalIgnoreCase))
+                {
+                    <span>Voice channel — connect to start talking.</span>
+                }
+                else
+                {
+                    <span>Welcome to #@_selectedChannel.Name! Start the conversation.</span>
+                }
+            </MudText>
+        }
+        else if (_selectedServer is not null)
+        {
+            <div class="d-flex flex-column align-center justify-center" style="height: 100%;">
+                <MudIcon Icon="@Icons.Material.Filled.Forum" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-4">
+                    Welcome to @_selectedServer.Name
+                </MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Select a channel from the sidebar to get started.
+                </MudText>
+            </div>
+        }
+        else
+        {
+            <div class="d-flex flex-column align-center justify-center" style="height: 100%;">
+                <MudIcon Icon="@Icons.Material.Filled.Forum" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-4">
+                    Select a Server
+                </MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Choose a server from the sidebar or create a new one.
+                </MudText>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Guid? ServerId { get; set; }
+
+    [Parameter]
+    public Guid? ChannelId { get; set; }
+
+    private ServerSidebar _serverSidebar = null!;
+    private ChannelList _channelList = null!;
+    private ServerResponse? _selectedServer;
+    private ChannelResponse? _selectedChannel;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ServerId.HasValue && (_selectedServer is null || _selectedServer.Id != ServerId.Value))
+        {
+            var server = await ServerService.GetServerByIdAsync(ServerId.Value);
+            if (server is not null)
+            {
+                _selectedServer = server;
+            }
+        }
+    }
+
+    private void OnServerSelectedAsync(ServerResponse server)
+    {
+        _selectedServer = server;
+        _selectedChannel = null;
+        Navigation.NavigateTo($"/servers/{server.Id}");
+    }
+
+    private void OnChannelSelectedAsync(ChannelResponse channel)
+    {
+        _selectedChannel = channel;
+        if (_selectedServer is not null)
+        {
+            Navigation.NavigateTo($"/servers/{_selectedServer.Id}/channels/{channel.Id}");
+        }
+    }
+
+    private Task OnServersChangedAsync()
+    {
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task OnServerUpdatedAsync()
+    {
+        if (_selectedServer is not null)
+        {
+            var updated = await ServerService.GetServerByIdAsync(_selectedServer.Id);
+            if (updated is not null)
+            {
+                _selectedServer = updated;
+            }
+        }
+        await _serverSidebar.LoadServersAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnServerDeletedAsync()
+    {
+        _selectedServer = null;
+        _selectedChannel = null;
+        await _serverSidebar.LoadServersAsync();
+        Navigation.NavigateTo("/servers");
+    }
+}

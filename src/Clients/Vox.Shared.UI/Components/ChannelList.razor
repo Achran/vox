@@ -1,0 +1,333 @@
+@inject IChannelService ChannelService
+@inject IServerService ServerService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<div style="width: 240px; height: 100%; display: flex; flex-direction: column; background-color: var(--mud-palette-surface);">
+    @if (Server is not null)
+    {
+        <div class="pa-3" style="border-bottom: 1px solid var(--mud-palette-lines-default);">
+            <div class="d-flex align-center justify-space-between">
+                <MudText Typo="Typo.h6" Class="mud-text-truncate" Style="flex: 1;">
+                    @Server.Name
+                </MudText>
+                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                    <MudMenuItem OnClick="OpenRenameServerDialogAsync"
+                                 Icon="@Icons.Material.Filled.Edit">
+                        Rename Server
+                    </MudMenuItem>
+                    <MudMenuItem OnClick="OpenDeleteServerDialogAsync"
+                                 Icon="@Icons.Material.Filled.Delete"
+                                 IconColor="Color.Error">
+                        Delete Server
+                    </MudMenuItem>
+                </MudMenu>
+            </div>
+            @if (!string.IsNullOrEmpty(Server.Description))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mud-text-truncate">
+                    @Server.Description
+                </MudText>
+            }
+        </div>
+
+        <div class="flex-grow-1" style="overflow-y: auto;">
+            @if (_loading)
+            {
+                <div class="d-flex justify-center pa-4">
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                </div>
+            }
+            else
+            {
+                if (TextChannels.Count > 0)
+                {
+                    <div class="pa-2">
+                        <div class="d-flex align-center justify-space-between px-1 mb-1">
+                            <MudText Typo="Typo.overline" Color="Color.Secondary">TEXT CHANNELS</MudText>
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                           OnClick="OpenCreateTextChannelDialogAsync" />
+                        </div>
+                        @foreach (var channel in TextChannels)
+                        {
+                            <MudNavLink Style="@GetChannelStyle(channel)"
+                                        OnClick="@(() => SelectChannel(channel))"
+                                        Icon="@Icons.Material.Filled.Tag"
+                                        IconColor="@(channel.Id == SelectedChannelId ? Color.Primary : Color.Default)">
+                                <div class="d-flex align-center justify-space-between" style="width: 100%;">
+                                    <span class="mud-text-truncate">@channel.Name</span>
+                                    <MudMenu Icon="@Icons.Material.Filled.MoreVert"
+                                             Size="Size.Small" Dense="true"
+                                             ActivationEvent="@MouseEvent.LeftClick">
+                                        <MudMenuItem OnClick="@(() => OpenRenameChannelDialogAsync(channel))"
+                                                     Icon="@Icons.Material.Filled.Edit">
+                                            Rename
+                                        </MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => OpenDeleteChannelDialogAsync(channel))"
+                                                     Icon="@Icons.Material.Filled.Delete"
+                                                     IconColor="Color.Error">
+                                            Delete
+                                        </MudMenuItem>
+                                    </MudMenu>
+                                </div>
+                            </MudNavLink>
+                        }
+                    </div>
+                }
+
+                if (VoiceChannels.Count > 0)
+                {
+                    <div class="pa-2">
+                        <div class="d-flex align-center justify-space-between px-1 mb-1">
+                            <MudText Typo="Typo.overline" Color="Color.Secondary">VOICE CHANNELS</MudText>
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                           OnClick="OpenCreateVoiceChannelDialogAsync" />
+                        </div>
+                        @foreach (var channel in VoiceChannels)
+                        {
+                            <MudNavLink Style="@GetChannelStyle(channel)"
+                                        OnClick="@(() => SelectChannel(channel))"
+                                        Icon="@Icons.Material.Filled.VolumeUp"
+                                        IconColor="@(channel.Id == SelectedChannelId ? Color.Primary : Color.Default)">
+                                <div class="d-flex align-center justify-space-between" style="width: 100%;">
+                                    <span class="mud-text-truncate">@channel.Name</span>
+                                    <MudMenu Icon="@Icons.Material.Filled.MoreVert"
+                                             Size="Size.Small" Dense="true"
+                                             ActivationEvent="@MouseEvent.LeftClick">
+                                        <MudMenuItem OnClick="@(() => OpenRenameChannelDialogAsync(channel))"
+                                                     Icon="@Icons.Material.Filled.Edit">
+                                            Rename
+                                        </MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => OpenDeleteChannelDialogAsync(channel))"
+                                                     Icon="@Icons.Material.Filled.Delete"
+                                                     IconColor="Color.Error">
+                                            Delete
+                                        </MudMenuItem>
+                                    </MudMenu>
+                                </div>
+                            </MudNavLink>
+                        }
+                    </div>
+                }
+
+                if (_channels.Count == 0)
+                {
+                    <div class="pa-4 d-flex flex-column align-center">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">
+                            No channels yet.
+                        </MudText>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="OpenCreateTextChannelDialogAsync" Class="mt-2">
+                            Create one
+                        </MudButton>
+                    </div>
+                }
+            }
+        </div>
+    }
+    else
+    {
+        <div class="pa-4 d-flex flex-column align-center justify-center" style="height: 100%;">
+            <MudIcon Icon="@Icons.Material.Filled.Forum" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Class="mt-2">
+                Select a server to view channels
+            </MudText>
+        </div>
+    }
+</div>
+
+@code {
+    private const string TextType = "Text";
+    private const string VoiceType = "Voice";
+
+    [Parameter]
+    public ServerResponse? Server { get; set; }
+
+    [Parameter]
+    public Guid? SelectedChannelId { get; set; }
+
+    [Parameter]
+    public EventCallback<ChannelResponse> OnChannelSelected { get; set; }
+
+    [Parameter]
+    public EventCallback OnChannelsChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnServerUpdated { get; set; }
+
+    [Parameter]
+    public EventCallback OnServerDeleted { get; set; }
+
+    private List<ChannelResponse> _channels = [];
+    private bool _loading;
+    private Guid? _lastServerId;
+
+    private List<ChannelResponse> TextChannels =>
+        _channels.Where(c => c.Type.Equals(TextType, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    private List<ChannelResponse> VoiceChannels =>
+        _channels.Where(c => c.Type.Equals(VoiceType, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Server?.Id != _lastServerId)
+        {
+            _lastServerId = Server?.Id;
+            if (Server is not null)
+            {
+                await LoadChannelsAsync();
+            }
+            else
+            {
+                _channels = [];
+            }
+        }
+    }
+
+    public async Task LoadChannelsAsync()
+    {
+        if (Server is null) return;
+
+        _loading = true;
+        StateHasChanged();
+
+        var channels = await ChannelService.GetServerChannelsAsync(Server.Id);
+        _channels = channels.ToList();
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task SelectChannel(ChannelResponse channel)
+    {
+        await OnChannelSelected.InvokeAsync(channel);
+    }
+
+    private string GetChannelStyle(ChannelResponse channel)
+    {
+        return channel.Id == SelectedChannelId
+            ? "background-color: var(--mud-palette-primary-lighten); border-radius: 4px;"
+            : "";
+    }
+
+    private Task OpenCreateTextChannelDialogAsync() => OpenCreateChannelDialogAsync(TextType);
+
+    private Task OpenCreateVoiceChannelDialogAsync() => OpenCreateChannelDialogAsync(VoiceType);
+
+    private async Task OpenCreateChannelDialogAsync(string defaultType)
+    {
+        var parameters = new DialogParameters<CreateChannelDialog>
+        {
+            { x => x.ServerId, Server!.Id }
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateChannelDialog>("Create Channel", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadChannelsAsync();
+            if (result.Data is ChannelResponse newChannel)
+            {
+                await OnChannelSelected.InvokeAsync(newChannel);
+            }
+            await OnChannelsChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OpenRenameChannelDialogAsync(ChannelResponse channel)
+    {
+        var parameters = new DialogParameters<RenameChannelDialog>
+        {
+            { x => x.ChannelId, channel.Id },
+            { x => x.Name, channel.Name }
+        };
+
+        var dialog = await DialogService.ShowAsync<RenameChannelDialog>("Rename Channel", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadChannelsAsync();
+            await OnChannelsChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OpenDeleteChannelDialogAsync(ChannelResponse channel)
+    {
+        var parameters = new DialogParameters<DeleteConfirmDialog>
+        {
+            { x => x.Message, $"Are you sure you want to delete the channel \"{channel.Name}\"? This action cannot be undone." }
+        };
+
+        var dialog = await DialogService.ShowAsync<DeleteConfirmDialog>("Delete Channel", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            var deleted = await ChannelService.DeleteChannelAsync(channel.Id);
+            if (deleted)
+            {
+                Snackbar.Add($"Channel \"{channel.Name}\" deleted.", Severity.Success);
+                await LoadChannelsAsync();
+                await OnChannelsChanged.InvokeAsync();
+            }
+            else
+            {
+                Snackbar.Add(ChannelService.ErrorMessage ?? "Failed to delete channel.", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenRenameServerDialogAsync()
+    {
+        if (Server is null) return;
+
+        var parameters = new DialogParameters<RenameServerDialog>
+        {
+            { x => x.ServerId, Server.Id },
+            { x => x.Name, Server.Name },
+            { x => x.Description, Server.Description }
+        };
+
+        var dialog = await DialogService.ShowAsync<RenameServerDialog>("Rename Server", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await OnServerUpdated.InvokeAsync();
+        }
+    }
+
+    private async Task OpenDeleteServerDialogAsync()
+    {
+        if (Server is null) return;
+
+        var parameters = new DialogParameters<DeleteConfirmDialog>
+        {
+            { x => x.Message, $"Are you sure you want to delete the server \"{Server.Name}\"? All channels and data will be permanently lost." }
+        };
+
+        var dialog = await DialogService.ShowAsync<DeleteConfirmDialog>("Delete Server", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            var deleted = await ServerService.DeleteServerAsync(Server.Id);
+            if (deleted)
+            {
+                Snackbar.Add($"Server \"{Server.Name}\" deleted.", Severity.Success);
+                await OnServerDeleted.InvokeAsync();
+            }
+            else
+            {
+                Snackbar.Add(ServerService.ErrorMessage ?? "Failed to delete server.", Severity.Error);
+            }
+        }
+    }
+}
