@@ -29,6 +29,7 @@ public class MessageRepository : IMessageRepository
 
         return await query
             .OrderByDescending(m => m.CreatedAt)
+            .ThenByDescending(m => m.Id)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
     }
