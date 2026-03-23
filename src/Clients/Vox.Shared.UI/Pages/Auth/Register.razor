@@ -48,7 +48,7 @@
                     InputType="InputType.Email"
                     Required="true"
                     RequiredError="Email is required."
-                    Validation="@(new Func<string, string?>(value => string.IsNullOrWhiteSpace(value) || new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(value) ? null : \"Please enter a valid email address.\"))"
+                    Validation="@(new Func<string, string?>(ValidateEmail))"
                     Adornment="Adornment.Start"
                     AdornmentIcon="@Icons.Material.Filled.Email"
                     Class="mb-3" />
@@ -132,6 +132,14 @@
     {
         if (string.IsNullOrWhiteSpace(value)) return "Display name is required.";
         if (value.Length > 64) return "Display name must not exceed 64 characters.";
+        return null;
+    }
+
+    private static string? ValidateEmail(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "Email is required.";
+        if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(value))
+            return "Please enter a valid email address.";
         return null;
     }
 
