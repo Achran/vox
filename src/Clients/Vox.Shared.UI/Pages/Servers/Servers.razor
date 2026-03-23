@@ -2,8 +2,10 @@
 @page "/servers/{ServerId:guid}"
 @page "/servers/{ServerId:guid}/channels/{ChannelId:guid}"
 @attribute [Authorize]
+@implements IAsyncDisposable
 @inject IServerService ServerService
 @inject IChannelService ChannelService
+@inject IPresenceService PresenceService
 @inject NavigationManager Navigation
 
 <PageTitle>Servers - Vox</PageTitle>
@@ -21,7 +23,7 @@
                  OnServerUpdated="OnServerUpdatedAsync"
                  OnServerDeleted="OnServerDeletedAsync" />
 
-    <div class="flex-grow-1 pa-4" style="overflow-y: auto;">
+    <div class="flex-grow-1 pa-4" style="overflow-y: auto; min-width: 0;">
         @if (_selectedChannel is not null)
         {
             <div class="d-flex align-center mb-4">
@@ -71,6 +73,8 @@
             </div>
         }
     </div>
+
+    <OnlineUsersPanel />
 </div>
 
 @code {
@@ -83,6 +87,11 @@
     private ServerSidebar _serverSidebar = null!;
     private ServerResponse? _selectedServer;
     private ChannelResponse? _selectedChannel;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await PresenceService.StartAsync();
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -161,5 +170,10 @@
         _selectedChannel = null;
         await _serverSidebar.LoadServersAsync();
         Navigation.NavigateTo("/servers");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await PresenceService.StopAsync();
     }
 }
