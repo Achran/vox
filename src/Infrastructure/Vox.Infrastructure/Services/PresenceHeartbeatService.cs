@@ -32,7 +32,7 @@ public sealed class PresenceHeartbeatService : BackgroundService
             try
             {
                 await Task.Delay(CheckInterval, stoppingToken);
-                await CleanupStaleConnectionsAsync();
+                await CleanupStaleConnectionsAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -45,12 +45,14 @@ public sealed class PresenceHeartbeatService : BackgroundService
         }
     }
 
-    private async Task CleanupStaleConnectionsAsync()
+    internal async Task CleanupStaleConnectionsAsync(CancellationToken cancellationToken = default)
     {
         var staleConnectionIds = _presenceService.GetStaleConnectionIds(StaleTimeout);
 
         foreach (var connectionId in staleConnectionIds)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             // Re-check: the connection may have sent a heartbeat after the snapshot
             if (!_presenceService.IsConnectionStale(connectionId, StaleTimeout))
             {
@@ -75,7 +77,7 @@ public sealed class PresenceHeartbeatService : BackgroundService
                     if (!_presenceService.IsUserInChannel(userId, channelId))
                     {
                         await _hubContext.Clients.Group(channelId)
-                            .SendAsync("UserStatusChanged", userId, "Offline");
+                            .SendAsync("UserStatusChanged", userId, "Offline", cancellationToken);
                     }
                 }
             }

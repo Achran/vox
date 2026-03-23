@@ -29,5 +29,9 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vox.Infrastructure.Tests" />
+  </ItemGroup>
+
 </Project>
 
