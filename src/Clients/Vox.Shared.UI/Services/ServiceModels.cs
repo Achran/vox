@@ -19,3 +19,11 @@ public sealed record CreateServerRequest(string Name, string? Description);
 public sealed record UpdateServerRequest(string Name, string? Description);
 public sealed record CreateChannelRequest(string Name, string Type);
 public sealed record UpdateChannelRequest(string Name);
+
+public sealed record MessageResponse(
+    Guid Id,
+    Guid AuthorId,
+    Guid ChannelId,
+    string Content,
+    bool IsEdited,
+    DateTime CreatedAt);

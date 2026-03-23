@@ -1,0 +1,76 @@
+@inject IChatService ChatService
+@implements IDisposable
+
+@if (_typingUsers.Any())
+{
+    <div class="px-3 py-1" style="min-height: 24px;">
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            @GetTypingText()
+        </MudText>
+    </div>
+}
+else
+{
+    <div style="min-height: 24px;"></div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid ChannelId { get; set; }
+
+    private readonly Dictionary<string, DateTime> _typingUsers = new();
+    private System.Threading.Timer? _cleanupTimer;
+
+    protected override void OnInitialized()
+    {
+        ChatService.UserTyping += OnUserTyping;
+        _cleanupTimer = new System.Threading.Timer(_ => CleanupExpiredTyping(), null, 1000, 1000);
+    }
+
+    private void OnUserTyping(string userId, string channelId)
+    {
+        if (!Guid.TryParse(channelId, out var parsedChannelId) || parsedChannelId != ChannelId)
+            return;
+
+        InvokeAsync(() =>
+        {
+            _typingUsers[userId] = DateTime.UtcNow;
+            StateHasChanged();
+        });
+    }
+
+    private void CleanupExpiredTyping()
+    {
+        var expired = _typingUsers
+            .Where(kvp => (DateTime.UtcNow - kvp.Value).TotalSeconds > 5)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        if (!expired.Any())
+            return;
+
+        InvokeAsync(() =>
+        {
+            foreach (var key in expired)
+                _typingUsers.Remove(key);
+            StateHasChanged();
+        });
+    }
+
+    private string GetTypingText()
+    {
+        var users = _typingUsers.Keys.Select(u => u[..Math.Min(8, u.Length)]).ToList();
+        return users.Count switch
+        {
+            1 => $"{users[0]} is typing...",
+            2 => $"{users[0]} and {users[1]} are typing...",
+            _ => "Several people are typing..."
+        };
+    }
+
+    public void Dispose()
+    {
+        ChatService.UserTyping -= OnUserTyping;
+        _cleanupTimer?.Dispose();
+    }
+}

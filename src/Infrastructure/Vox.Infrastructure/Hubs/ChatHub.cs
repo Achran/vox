@@ -8,10 +8,12 @@ namespace Vox.Infrastructure.Hubs;
 public class ChatHub : Hub
 {
     private readonly IPresenceService _presenceService;
+    private readonly IMediator _mediator;
 
-    public ChatHub(IPresenceService presenceService)
+    public ChatHub(IPresenceService presenceService, IMediator mediator)
     {
         _presenceService = presenceService;
+        _mediator = mediator;
     }
 
     public async Task SendMessage(string channelId, string message)
@@ -56,6 +58,12 @@ public class ChatHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, channelId);
         await _presenceService.UserLeftChannelAsync(Context.ConnectionId, channelId);
         await Clients.Group(channelId).SendAsync("UserLeft", Context.UserIdentifier, channelId);
+    }
+
+    public async Task StartTyping(string channelId)
+    {
+        var userId = GetDomainUserId();
+        await Clients.OthersInGroup(channelId).SendAsync("UserTyping", userId.ToString(), channelId);
     }
 
     public async Task Heartbeat()

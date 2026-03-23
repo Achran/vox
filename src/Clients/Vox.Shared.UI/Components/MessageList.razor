@@ -1,0 +1,177 @@
+@inject IMessageService MessageService
+@inject IChatService ChatService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div @ref="_containerRef"
+     class="d-flex flex-column"
+     style="flex: 1; overflow-y: auto; padding: 16px;"
+     @onscroll="OnScrollAsync">
+
+    @if (_loadingOlder)
+    {
+        <div class="d-flex justify-center pa-2">
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+        </div>
+    }
+    else if (_hasMoreMessages)
+    {
+        <div class="d-flex justify-center pa-2">
+            <MudButton Variant="Variant.Text"
+                       Size="Size.Small"
+                       OnClick="LoadOlderMessagesAsync">
+                Load older messages
+            </MudButton>
+        </div>
+    }
+
+    @if (!_messages.Any() && !_loading)
+    {
+        <div class="d-flex flex-column align-center justify-center" style="flex: 1;">
+            <MudIcon Icon="@Icons.Material.Filled.ChatBubbleOutline"
+                     Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">
+                No messages yet. Start the conversation!
+            </MudText>
+        </div>
+    }
+    else
+    {
+        @foreach (var message in _messages)
+        {
+            <div class="d-flex flex-column mb-3">
+                <div class="d-flex align-center gap-2">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">
+                        @message.AuthorId.ToString()[..8]
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @message.CreatedAt.ToString("g")
+                    </MudText>
+                    @if (message.IsEdited)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">(edited)</MudText>
+                    }
+                </div>
+                <MudText Typo="Typo.body1">@message.Content</MudText>
+            </div>
+        }
+    }
+
+    <div @ref="_bottomRef"></div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid ChannelId { get; set; }
+
+    private ElementReference _containerRef;
+    private ElementReference _bottomRef;
+    private List<MessageResponse> _messages = [];
+    private bool _loading;
+    private bool _loadingOlder;
+    private bool _hasMoreMessages = true;
+    private Guid _currentChannelId;
+    private const int PageSize = 50;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_currentChannelId == ChannelId)
+            return;
+
+        _currentChannelId = ChannelId;
+        _messages.Clear();
+        _hasMoreMessages = true;
+        _loading = true;
+        StateHasChanged();
+
+        await LoadMessagesAsync();
+
+        _loading = false;
+        StateHasChanged();
+
+        await ScrollToBottomAsync();
+    }
+
+    protected override void OnInitialized()
+    {
+        ChatService.MessageReceived += OnMessageReceived;
+    }
+
+    private async Task LoadMessagesAsync()
+    {
+        var messages = await MessageService.GetChannelMessagesAsync(ChannelId, PageSize);
+        _messages = messages.OrderBy(m => m.CreatedAt).ToList();
+        _hasMoreMessages = messages.Count >= PageSize;
+    }
+
+    private async Task LoadOlderMessagesAsync()
+    {
+        if (_loadingOlder || !_hasMoreMessages || !_messages.Any())
+            return;
+
+        _loadingOlder = true;
+        StateHasChanged();
+
+        var oldest = _messages.First().CreatedAt;
+        var olderMessages = await MessageService.GetChannelMessagesAsync(ChannelId, PageSize, oldest);
+
+        if (olderMessages.Count < PageSize)
+            _hasMoreMessages = false;
+
+        if (olderMessages.Any())
+        {
+            _messages.InsertRange(0, olderMessages.OrderBy(m => m.CreatedAt));
+        }
+
+        _loadingOlder = false;
+        StateHasChanged();
+    }
+
+    private async Task OnScrollAsync()
+    {
+        try
+        {
+            var scrollTop = await JS.InvokeAsync<double>("eval", "document.querySelector('[data-chat-scroll]')?.scrollTop ?? -1");
+            if (scrollTop >= 0 && scrollTop < 50)
+            {
+                await LoadOlderMessagesAsync();
+            }
+        }
+        catch
+        {
+            // JS interop may fail during prerendering
+        }
+    }
+
+    private void OnMessageReceived(MessageResponse message)
+    {
+        if (message.ChannelId != ChannelId)
+            return;
+
+        InvokeAsync(async () =>
+        {
+            _messages.Add(message);
+            StateHasChanged();
+            await ScrollToBottomAsync();
+        });
+    }
+
+    private async Task ScrollToBottomAsync()
+    {
+        try
+        {
+            await Task.Yield();
+            await JS.InvokeVoidAsync("eval",
+                "setTimeout(() => { const el = document.querySelector('[data-chat-scroll]'); if (el) el.scrollTop = el.scrollHeight; }, 50)");
+        }
+        catch
+        {
+            // JS interop may fail during prerendering
+        }
+    }
+
+    public void Dispose()
+    {
+        ChatService.MessageReceived -= OnMessageReceived;
+    }
+}

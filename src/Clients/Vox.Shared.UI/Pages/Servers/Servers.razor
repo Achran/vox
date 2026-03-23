@@ -21,10 +21,10 @@
                  OnServerUpdated="OnServerUpdatedAsync"
                  OnServerDeleted="OnServerDeletedAsync" />
 
-    <div class="flex-grow-1 pa-4" style="overflow-y: auto;">
+    <div class="flex-grow-1" style="overflow-y: auto; display: flex; flex-direction: column;">
         @if (_selectedChannel is not null)
         {
-            <div class="d-flex align-center mb-4">
+            <div class="d-flex align-center pa-3" style="border-bottom: 1px solid var(--mud-palette-lines-default);">
                 @if (_selectedChannel.Type.Equals("Text", StringComparison.OrdinalIgnoreCase))
                 {
                     <MudIcon Icon="@Icons.Material.Filled.Tag" Class="mr-2" />
@@ -33,18 +33,22 @@
                 {
                     <MudIcon Icon="@Icons.Material.Filled.VolumeUp" Class="mr-2" />
                 }
-                <MudText Typo="Typo.h5">@_selectedChannel.Name</MudText>
+                <MudText Typo="Typo.h6">@_selectedChannel.Name</MudText>
             </div>
-            <MudText Typo="Typo.body1" Color="Color.Secondary">
-                @if (_selectedChannel.Type.Equals("Voice", StringComparison.OrdinalIgnoreCase))
-                {
-                    <span>Voice channel — connect to start talking.</span>
-                }
-                else
-                {
-                    <span>Welcome to #@_selectedChannel.Name! Start the conversation.</span>
-                }
-            </MudText>
+
+            @if (_selectedChannel.Type.Equals("Text", StringComparison.OrdinalIgnoreCase))
+            {
+                <ChatArea ChannelId="@_selectedChannel.Id" ChannelName="@_selectedChannel.Name" />
+            }
+            else
+            {
+                <div class="d-flex flex-column align-center justify-center pa-4" style="flex: 1;">
+                    <MudIcon Icon="@Icons.Material.Filled.VolumeUp" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">
+                        Voice channel — connect to start talking.
+                    </MudText>
+                </div>
+            }
         }
         else if (_selectedServer is not null)
         {
