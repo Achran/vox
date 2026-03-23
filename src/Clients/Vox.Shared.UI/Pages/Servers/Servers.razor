@@ -88,13 +88,10 @@
     private ServerResponse? _selectedServer;
     private ChannelResponse? _selectedChannel;
 
-    protected override async Task OnInitializedAsync()
-    {
-        await PresenceService.StartAsync(ServerId);
-    }
-
     protected override async Task OnParametersSetAsync()
     {
+        await PresenceService.StartAsync(ServerId);
+
         if (!ServerId.HasValue)
         {
             _selectedServer = null;

@@ -37,6 +37,16 @@ public class ChatHub : Hub
         });
     }
 
+    public async Task JoinServer(string serverId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"server:{serverId}");
+    }
+
+    public async Task LeaveServer(string serverId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"server:{serverId}");
+    }
+
     public async Task JoinChannel(string channelId)
     {
         var userId = Context.UserIdentifier;
@@ -70,8 +80,7 @@ public class ChatHub : Hub
         var userId = Context.UserIdentifier;
         if (userId is not null)
         {
-            var isFirstConnection = !_presenceService.IsUserOnline(userId);
-            await _presenceService.UserConnectedAsync(Context.ConnectionId, userId);
+            var isFirstConnection = await _presenceService.UserConnectedAsync(Context.ConnectionId, userId);
 
             if (isFirstConnection)
             {
@@ -90,7 +99,7 @@ public class ChatHub : Hub
         var userId = Context.UserIdentifier;
         var channels = _presenceService.GetChannelsByConnectionId(Context.ConnectionId);
 
-        await _presenceService.UserDisconnectedAsync(Context.ConnectionId);
+        var isLastConnection = await _presenceService.UserDisconnectedAsync(Context.ConnectionId);
 
         if (userId is not null)
         {
@@ -102,7 +111,7 @@ public class ChatHub : Hub
                 }
             }
 
-            if (!_presenceService.IsUserOnline(userId))
+            if (isLastConnection)
             {
                 await Clients.Others.SendAsync("UserOffline", userId);
             }

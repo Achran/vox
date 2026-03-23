@@ -13,6 +13,7 @@ public sealed class PresenceService : IPresenceService
     private readonly object _lock = new();
     private List<OnlineUserInfo> _onlineUsers = [];
     private Guid? _serverId;
+    private Timer? _heartbeatTimer;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public IReadOnlyList<OnlineUserInfo> OnlineUsers
@@ -31,7 +32,23 @@ public sealed class PresenceService : IPresenceService
     public async Task StartAsync(Guid? serverId = null)
     {
         if (_hubConnection is not null)
+        {
+            if (_serverId != serverId)
+            {
+                // Leave old server group, join new one, and re-fetch
+                if (_serverId.HasValue)
+                    await _hubConnection.SendAsync("LeaveServer", _serverId.Value.ToString());
+
+                _serverId = serverId;
+
+                if (_serverId.HasValue)
+                    await _hubConnection.SendAsync("JoinServer", _serverId.Value.ToString());
+
+                await FetchOnlineUsersAsync();
+            }
+
             return;
+        }
 
         _serverId = serverId;
 
@@ -75,6 +92,10 @@ public sealed class PresenceService : IPresenceService
 
         connection.Reconnected += async _ =>
         {
+            if (_serverId.HasValue)
+                await connection.SendAsync("JoinServer", _serverId.Value.ToString());
+
+            StartHeartbeat();
             await FetchOnlineUsersAsync();
         };
 
@@ -82,6 +103,11 @@ public sealed class PresenceService : IPresenceService
         {
             await connection.StartAsync();
             _hubConnection = connection;
+
+            if (_serverId.HasValue)
+                await connection.SendAsync("JoinServer", _serverId.Value.ToString());
+
+            StartHeartbeat();
             await FetchOnlineUsersAsync();
         }
         catch
@@ -93,6 +119,8 @@ public sealed class PresenceService : IPresenceService
 
     public async Task StopAsync()
     {
+        StopHeartbeat();
+
         lock (_lock) { _onlineUsers = []; }
         OnUsersChanged?.Invoke();
 
@@ -109,9 +137,37 @@ public sealed class PresenceService : IPresenceService
         await StopAsync();
     }
 
+    private void StartHeartbeat()
+    {
+        StopHeartbeat();
+        _heartbeatTimer = new Timer(async _ =>
+        {
+            try
+            {
+                if (_hubConnection?.State == HubConnectionState.Connected)
+                    await _hubConnection.SendAsync("Heartbeat");
+            }
+            catch
+            {
+                // Ignore heartbeat failures; reconnect logic will handle recovery
+            }
+        }, null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+    }
+
+    private void StopHeartbeat()
+    {
+        _heartbeatTimer?.Dispose();
+        _heartbeatTimer = null;
+    }
+
     private async Task FetchOnlineUsersAsync()
     {
-        if (_serverId is null) return;
+        if (_serverId is null)
+        {
+            lock (_lock) { _onlineUsers = []; }
+            OnUsersChanged?.Invoke();
+            return;
+        }
 
         try
         {
