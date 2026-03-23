@@ -29,7 +29,7 @@ public sealed class ServerService : IServerService
         try
         {
             using var request = await CreateAuthorizedRequestAsync(HttpMethod.Get, "api/servers");
-            var response = await _http.SendAsync(request);
+            using var response = await _http.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
