@@ -29,9 +29,13 @@ public static class ChannelEndpoints
     private static async Task<IResult> CreateChannelAsync(
         Guid serverId, CreateChannelRequest request, HttpContext httpContext, IMediator mediator, CancellationToken ct)
     {
+        if (!EndpointHelpers.TryGetDomainUserId(httpContext, out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
         try
         {
-            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             var result = await mediator.Send(
                 new CreateChannelCommand(serverId, request.Name, request.Type, userId), ct);
             return Results.Created($"/api/channels/{result.Id}", result);
@@ -71,9 +75,13 @@ public static class ChannelEndpoints
     private static async Task<IResult> UpdateChannelAsync(
         Guid id, UpdateChannelRequest request, HttpContext httpContext, IMediator mediator, CancellationToken ct)
     {
+        if (!EndpointHelpers.TryGetDomainUserId(httpContext, out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
         try
         {
-            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             var result = await mediator.Send(
                 new UpdateChannelCommand(id, request.Name, userId), ct);
             return Results.Ok(result);
@@ -95,9 +103,13 @@ public static class ChannelEndpoints
     private static async Task<IResult> DeleteChannelAsync(
         Guid id, HttpContext httpContext, IMediator mediator, CancellationToken ct)
     {
+        if (!EndpointHelpers.TryGetDomainUserId(httpContext, out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
         try
         {
-            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             await mediator.Send(new DeleteChannelCommand(id, userId), ct);
             return Results.NoContent();
         }

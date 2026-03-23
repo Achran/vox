@@ -2,13 +2,14 @@ namespace Vox.Api.Endpoints;
 
 internal static class EndpointHelpers
 {
-    internal static Guid GetDomainUserId(HttpContext httpContext)
+    internal static bool TryGetDomainUserId(HttpContext httpContext, out Guid userId)
     {
         var domainUserId = httpContext.User.FindFirst("domain_user_id")?.Value;
-        if (domainUserId is null || !Guid.TryParse(domainUserId, out var userId))
+        if (domainUserId is not null && Guid.TryParse(domainUserId, out userId))
         {
-            throw new UnauthorizedAccessException("Domain user ID not found in token.");
+            return true;
         }
-        return userId;
+        userId = Guid.Empty;
+        return false;
     }
 }

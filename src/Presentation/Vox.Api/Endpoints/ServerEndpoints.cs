@@ -28,9 +28,13 @@ public static class ServerEndpoints
     private static async Task<IResult> CreateServerAsync(
         CreateServerRequest request, HttpContext httpContext, IMediator mediator, CancellationToken ct)
     {
+        if (!EndpointHelpers.TryGetDomainUserId(httpContext, out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
         try
         {
-            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             var result = await mediator.Send(
                 new CreateServerCommand(request.Name, request.Description, userId), ct);
             return Results.Created($"/api/servers/{result.Id}", result);
@@ -38,10 +42,6 @@ public static class ServerEndpoints
         catch (ValidationException ex)
         {
             return Results.BadRequest(new { errors = ex.Errors.Select(e => new { e.PropertyName, e.ErrorMessage }) });
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Results.Unauthorized();
         }
     }
 
@@ -55,24 +55,25 @@ public static class ServerEndpoints
     private static async Task<IResult> GetUserServersAsync(
         HttpContext httpContext, IMediator mediator, CancellationToken ct)
     {
-        try
-        {
-            var userId = EndpointHelpers.GetDomainUserId(httpContext);
-            var result = await mediator.Send(new GetUserServersQuery(userId), ct);
-            return Results.Ok(result);
-        }
-        catch (UnauthorizedAccessException)
+        if (!EndpointHelpers.TryGetDomainUserId(httpContext, out var userId))
         {
             return Results.Unauthorized();
         }
+
+        var result = await mediator.Send(new GetUserServersQuery(userId), ct);
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> UpdateServerAsync(
         Guid id, UpdateServerRequest request, HttpContext httpContext, IMediator mediator, CancellationToken ct)
     {
+        if (!EndpointHelpers.TryGetDomainUserId(httpContext, out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
         try
         {
-            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             var result = await mediator.Send(
                 new UpdateServerCommand(id, request.Name, request.Description, userId), ct);
             return Results.Ok(result);
@@ -94,9 +95,13 @@ public static class ServerEndpoints
     private static async Task<IResult> DeleteServerAsync(
         Guid id, HttpContext httpContext, IMediator mediator, CancellationToken ct)
     {
+        if (!EndpointHelpers.TryGetDomainUserId(httpContext, out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
         try
         {
-            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             await mediator.Send(new DeleteServerCommand(id, userId), ct);
             return Results.NoContent();
         }
@@ -113,19 +118,19 @@ public static class ServerEndpoints
     private static async Task<IResult> JoinServerAsync(
         Guid id, HttpContext httpContext, IMediator mediator, CancellationToken ct)
     {
+        if (!EndpointHelpers.TryGetDomainUserId(httpContext, out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
         try
         {
-            var userId = EndpointHelpers.GetDomainUserId(httpContext);
             var result = await mediator.Send(new JoinServerCommand(id, userId), ct);
             return Results.Ok(result);
         }
         catch (KeyNotFoundException)
         {
             return Results.NotFound();
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Results.Unauthorized();
         }
     }
 }
