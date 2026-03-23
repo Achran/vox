@@ -16,7 +16,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AspNet.Security.OAuth.GitHub" />
+    <PackageReference Include="AspNet.Security.OpenId.Steam" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Facebook" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Twitter" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />

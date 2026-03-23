@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,8 @@ namespace Vox.Infrastructure.DependencyInjection;
 
 public static class InfrastructureServiceExtensions
 {
+    public const string ExternalAuthCookieScheme = "ExternalAuth";
+
     public static IServiceCollection AddInfrastructureServices(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -40,6 +43,9 @@ public static class InfrastructureServiceExtensions
         var jwtSection = configuration.GetSection("JwtSettings");
         services.Configure<JwtSettings>(jwtSection);
 
+        var externalSection = configuration.GetSection("ExternalAuth");
+        services.Configure<ExternalAuthSettings>(externalSection);
+
         var secret = jwtSection["Secret"]
             ?? throw new InvalidOperationException("JwtSettings:Secret is not configured.");
 
@@ -49,7 +55,7 @@ public static class InfrastructureServiceExtensions
                 "JwtSettings:Secret must be at least 32 characters long (256 bits) for sufficient cryptographic strength.");
         }
 
-        services.AddAuthentication(options =>
+        var authBuilder = services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -82,7 +88,15 @@ public static class InfrastructureServiceExtensions
                     return Task.CompletedTask;
                 }
             };
+        })
+        .AddCookie(ExternalAuthCookieScheme, options =>
+        {
+            options.Cookie.Name = "VoxExternalAuth";
+            options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
+            options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
         });
+
+        AddExternalProviders(authBuilder, externalSection);
 
         services.AddSignalR();
 
@@ -90,5 +104,75 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IIdentityService, IdentityService>();
 
         return services;
+    }
+
+    private static void AddExternalProviders(
+        AuthenticationBuilder authBuilder,
+        IConfigurationSection externalSection)
+    {
+        var google = externalSection.GetSection("Google");
+        if (google.Exists() && !string.IsNullOrEmpty(google["ClientId"]))
+        {
+            authBuilder.AddGoogle(options =>
+            {
+                options.ClientId = google["ClientId"]!;
+                options.ClientSecret = google["ClientSecret"]!;
+                options.SignInScheme = ExternalAuthCookieScheme;
+            });
+        }
+
+        var microsoft = externalSection.GetSection("Microsoft");
+        if (microsoft.Exists() && !string.IsNullOrEmpty(microsoft["ClientId"]))
+        {
+            authBuilder.AddMicrosoftAccount(options =>
+            {
+                options.ClientId = microsoft["ClientId"]!;
+                options.ClientSecret = microsoft["ClientSecret"]!;
+                options.SignInScheme = ExternalAuthCookieScheme;
+            });
+        }
+
+        var facebook = externalSection.GetSection("Facebook");
+        if (facebook.Exists() && !string.IsNullOrEmpty(facebook["ClientId"]))
+        {
+            authBuilder.AddFacebook(options =>
+            {
+                options.AppId = facebook["ClientId"]!;
+                options.AppSecret = facebook["ClientSecret"]!;
+                options.SignInScheme = ExternalAuthCookieScheme;
+            });
+        }
+
+        var twitter = externalSection.GetSection("Twitter");
+        if (twitter.Exists() && !string.IsNullOrEmpty(twitter["ClientId"]))
+        {
+            authBuilder.AddTwitter(options =>
+            {
+                options.ConsumerKey = twitter["ClientId"]!;
+                options.ConsumerSecret = twitter["ClientSecret"]!;
+                options.SignInScheme = ExternalAuthCookieScheme;
+            });
+        }
+
+        var github = externalSection.GetSection("GitHub");
+        if (github.Exists() && !string.IsNullOrEmpty(github["ClientId"]))
+        {
+            authBuilder.AddGitHub(options =>
+            {
+                options.ClientId = github["ClientId"]!;
+                options.ClientSecret = github["ClientSecret"]!;
+                options.SignInScheme = ExternalAuthCookieScheme;
+            });
+        }
+
+        var steam = externalSection.GetSection("Steam");
+        if (steam.Exists() && !string.IsNullOrEmpty(steam["ApplicationKey"]))
+        {
+            authBuilder.AddSteam(options =>
+            {
+                options.ApplicationKey = steam["ApplicationKey"]!;
+                options.SignInScheme = ExternalAuthCookieScheme;
+            });
+        }
     }
 }

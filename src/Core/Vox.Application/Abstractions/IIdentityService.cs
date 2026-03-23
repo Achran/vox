@@ -38,4 +38,16 @@ public interface IIdentityService
     Task RevokeAsync(
         string refreshToken,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finds or creates a user from an external login provider and returns tokens.
+    /// If a user with the same email already exists, links the external login to the existing user.
+    /// Throws <see cref="InvalidOperationException"/> if user creation fails.
+    /// </summary>
+    Task<AuthTokensDto> ExternalLoginAsync(
+        string provider,
+        string providerKey,
+        string? email,
+        string? displayName,
+        CancellationToken cancellationToken = default);
 }
