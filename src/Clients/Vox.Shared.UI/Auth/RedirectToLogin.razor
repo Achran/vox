@@ -1,9 +1,32 @@
+@using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@if (_isAuthenticated)
+{
+    <p>You are not authorized to access this page.</p>
+}
+else if (_isRedirecting)
+{
+    <p>Redirecting to login...</p>
+}
 
 @code {
-    protected override void OnInitialized()
+    private bool _isAuthenticated;
+    private bool _isRedirecting;
+
+    protected override async Task OnInitializedAsync()
     {
-        var returnUrl = Uri.EscapeDataString(Navigation.Uri);
-        Navigation.NavigateTo($"/login?returnUrl={returnUrl}");
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        _isAuthenticated = user?.Identity?.IsAuthenticated == true;
+
+        if (!_isAuthenticated)
+        {
+            _isRedirecting = true;
+            var returnUrl = Uri.EscapeDataString(Navigation.Uri);
+            Navigation.NavigateTo($"/login?returnUrl={returnUrl}");
+        }
     }
 }
