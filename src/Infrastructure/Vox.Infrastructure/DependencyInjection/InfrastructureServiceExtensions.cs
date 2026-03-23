@@ -109,6 +109,12 @@ public static class InfrastructureServiceExtensions
         services.AddSingleton<IPresenceService, PresenceService>();
         services.AddHostedService<PresenceHeartbeatService>();
 
+        services.AddSingleton<IVoiceSessionService, VoiceSessionService>();
+
+        var liveKitSection = configuration.GetSection("LiveKit");
+        services.Configure<LiveKitSettings>(liveKitSection);
+        services.AddSingleton<ILiveKitService, LiveKitService>();
+
         return services;
     }
 

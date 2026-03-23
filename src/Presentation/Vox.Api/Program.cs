@@ -54,6 +54,7 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapHub<ChatHub>("/hubs/chat");
+app.MapHub<VoiceHub>("/hubs/voice");
 
 app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Timestamp = DateTime.UtcNow }))
    .WithName("HealthCheck")
@@ -66,6 +67,7 @@ app.MapServerEndpoints();
 app.MapChannelEndpoints();
 app.MapPresenceEndpoints();
 app.MapMessageEndpoints();
+app.MapVoiceEndpoints();
 
 app.Run();
 
