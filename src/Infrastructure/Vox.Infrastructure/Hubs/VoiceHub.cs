@@ -18,17 +18,28 @@ public class VoiceHub : Hub
     public async Task JoinVoiceChannel(string channelId)
     {
         var userId = GetUserId();
-        var isNew = _voiceSessionService.JoinChannel(channelId, userId, Context.ConnectionId);
 
+        // Add to SignalR group first so that if it fails we don't leave stale state
         await Groups.AddToGroupAsync(Context.ConnectionId, $"voice:{channelId}");
 
-        if (isNew)
+        try
         {
-            await Clients.OthersInGroup($"voice:{channelId}").SendAsync("UserJoinedVoice", userId, channelId);
-        }
+            var isNew = _voiceSessionService.JoinChannel(channelId, userId, Context.ConnectionId);
 
-        var participants = _voiceSessionService.GetParticipants(channelId);
-        await Clients.Caller.SendAsync("VoiceParticipants", channelId, participants);
+            if (isNew)
+            {
+                await Clients.OthersInGroup($"voice:{channelId}").SendAsync("UserJoinedVoice", userId, channelId);
+            }
+
+            var participants = _voiceSessionService.GetParticipants(channelId);
+            await Clients.Caller.SendAsync("VoiceParticipants", channelId, participants);
+        }
+        catch
+        {
+            // Rollback group membership on failure
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"voice:{channelId}");
+            throw;
+        }
     }
 
     /// <summary>Leave a voice channel. Notifies remaining participants.</summary>
@@ -49,6 +60,7 @@ public class VoiceHub : Hub
     public async Task SendOffer(string targetUserId, string channelId, string sdp)
     {
         var senderId = GetUserId();
+        ValidateChannelMembership(senderId, targetUserId, channelId);
         await Clients.User(targetUserId).SendAsync("ReceiveOffer", senderId, channelId, sdp);
     }
 
@@ -56,6 +68,7 @@ public class VoiceHub : Hub
     public async Task SendAnswer(string targetUserId, string channelId, string sdp)
     {
         var senderId = GetUserId();
+        ValidateChannelMembership(senderId, targetUserId, channelId);
         await Clients.User(targetUserId).SendAsync("ReceiveAnswer", senderId, channelId, sdp);
     }
 
@@ -63,6 +76,7 @@ public class VoiceHub : Hub
     public async Task SendIceCandidate(string targetUserId, string channelId, string candidate)
     {
         var senderId = GetUserId();
+        ValidateChannelMembership(senderId, targetUserId, channelId);
         await Clients.User(targetUserId).SendAsync("ReceiveIceCandidate", senderId, channelId, candidate);
     }
 
@@ -93,5 +107,18 @@ public class VoiceHub : Hub
             throw new HubException("Unauthorized.");
         }
         return userId;
+    }
+
+    private void ValidateChannelMembership(string senderId, string targetUserId, string channelId)
+    {
+        if (!_voiceSessionService.IsUserInVoiceChannel(channelId, senderId))
+        {
+            throw new HubException("You are not in this voice channel.");
+        }
+
+        if (!_voiceSessionService.IsUserInVoiceChannel(channelId, targetUserId))
+        {
+            throw new HubException("Target user is not in this voice channel.");
+        }
     }
 }

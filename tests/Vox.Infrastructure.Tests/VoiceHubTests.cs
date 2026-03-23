@@ -50,7 +50,7 @@ public class VoiceHubTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task JoinVoiceChannel_NewParticipant_NotifiesOthersAndReturnsParticipants()
+    public async Task JoinVoiceChannel_NewParticipant_AddsToGroupFirstThenNotifies()
     {
         // Arrange
         var userId = Guid.NewGuid().ToString();
@@ -68,7 +68,7 @@ public class VoiceHubTests
         // Act
         await _hub.JoinVoiceChannel(channelId);
 
-        // Assert
+        // Assert – group add happens first
         _groupsMock.Verify(g => g.AddToGroupAsync(connectionId, $"voice:{channelId}", It.IsAny<CancellationToken>()), Times.Once);
         _voiceSessionMock.Verify(v => v.JoinChannel(channelId, userId, connectionId), Times.Once);
         _othersInGroupProxyMock.Verify(
@@ -101,6 +101,28 @@ public class VoiceHubTests
         _othersInGroupProxyMock.Verify(
             c => c.SendCoreAsync("UserJoinedVoice", It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task JoinVoiceChannel_SessionFailure_RollsBackGroupMembership()
+    {
+        // Arrange
+        var userId = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+        var connectionId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(userId);
+        _contextMock.Setup(c => c.ConnectionId).Returns(connectionId);
+
+        _voiceSessionMock.Setup(v => v.JoinChannel(channelId, userId, connectionId))
+            .Throws(new InvalidOperationException("Session failure"));
+
+        // Act & Assert
+        var act = () => _hub.JoinVoiceChannel(channelId);
+        await act.Should().ThrowAsync<InvalidOperationException>();
+
+        // Group add was called, then rollback removed it
+        _groupsMock.Verify(g => g.AddToGroupAsync(connectionId, $"voice:{channelId}", It.IsAny<CancellationToken>()), Times.Once);
+        _groupsMock.Verify(g => g.RemoveFromGroupAsync(connectionId, $"voice:{channelId}", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // -------------------------------------------------------------------------
@@ -152,11 +174,11 @@ public class VoiceHubTests
     }
 
     // -------------------------------------------------------------------------
-    // SendOffer / SendAnswer / SendIceCandidate
+    // SendOffer / SendAnswer / SendIceCandidate – with membership validation
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task SendOffer_RelaysToTargetUser()
+    public async Task SendOffer_BothInChannel_RelaysToTargetUser()
     {
         // Arrange
         var senderId = Guid.NewGuid().ToString();
@@ -164,6 +186,8 @@ public class VoiceHubTests
         var channelId = Guid.NewGuid().ToString();
         SetupAuthenticatedUser(senderId);
 
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, senderId)).Returns(true);
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, targetId)).Returns(true);
         _clientsMock.Setup(c => c.User(targetId)).Returns(_userProxyMock.Object);
 
         // Act
@@ -178,7 +202,7 @@ public class VoiceHubTests
     }
 
     [Fact]
-    public async Task SendAnswer_RelaysToTargetUser()
+    public async Task SendOffer_SenderNotInChannel_ThrowsHubException()
     {
         // Arrange
         var senderId = Guid.NewGuid().ToString();
@@ -186,6 +210,41 @@ public class VoiceHubTests
         var channelId = Guid.NewGuid().ToString();
         SetupAuthenticatedUser(senderId);
 
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, senderId)).Returns(false);
+
+        // Act & Assert
+        var act = () => _hub.SendOffer(targetId, channelId, "sdp");
+        await act.Should().ThrowAsync<HubException>().WithMessage("You are not in this voice channel.");
+    }
+
+    [Fact]
+    public async Task SendOffer_TargetNotInChannel_ThrowsHubException()
+    {
+        // Arrange
+        var senderId = Guid.NewGuid().ToString();
+        var targetId = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(senderId);
+
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, senderId)).Returns(true);
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, targetId)).Returns(false);
+
+        // Act & Assert
+        var act = () => _hub.SendOffer(targetId, channelId, "sdp");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Target user is not in this voice channel.");
+    }
+
+    [Fact]
+    public async Task SendAnswer_BothInChannel_RelaysToTargetUser()
+    {
+        // Arrange
+        var senderId = Guid.NewGuid().ToString();
+        var targetId = Guid.NewGuid().ToString();
+        var channelId = Guid.NewGuid().ToString();
+        SetupAuthenticatedUser(senderId);
+
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, senderId)).Returns(true);
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, targetId)).Returns(true);
         _clientsMock.Setup(c => c.User(targetId)).Returns(_userProxyMock.Object);
 
         // Act
@@ -200,7 +259,7 @@ public class VoiceHubTests
     }
 
     [Fact]
-    public async Task SendIceCandidate_RelaysToTargetUser()
+    public async Task SendIceCandidate_BothInChannel_RelaysToTargetUser()
     {
         // Arrange
         var senderId = Guid.NewGuid().ToString();
@@ -208,6 +267,8 @@ public class VoiceHubTests
         var channelId = Guid.NewGuid().ToString();
         SetupAuthenticatedUser(senderId);
 
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, senderId)).Returns(true);
+        _voiceSessionMock.Setup(v => v.IsUserInVoiceChannel(channelId, targetId)).Returns(true);
         _clientsMock.Setup(c => c.User(targetId)).Returns(_userProxyMock.Object);
 
         // Act

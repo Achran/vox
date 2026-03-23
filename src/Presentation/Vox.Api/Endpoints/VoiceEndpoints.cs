@@ -21,8 +21,10 @@ public static class VoiceEndpoints
     private static IResult GetLiveKitTokenAsync(
         Guid channelId, HttpContext httpContext, ILiveKitService liveKitService)
     {
-        var userId = httpContext.User.FindFirst("domain_user_id")?.Value
-                     ?? httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        // Use ClaimTypes.NameIdentifier (sub) as the primary ID to align with
+        // SignalR's default Context.UserIdentifier, ensuring LiveKit token identity
+        // matches the IDs used by VoiceHub for peer signaling.
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
         if (userId is null)
         {
