@@ -5,6 +5,33 @@ namespace Vox.Application.Abstractions;
 public interface IIdentityService
 {
     /// <summary>
+    /// Returns the list of external login providers linked to the given user.
+    /// </summary>
+    Task<IReadOnlyList<LinkedAccountDto>> GetLinkedProvidersAsync(
+        string userId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Links a new external provider to an existing user account.
+    /// Throws <see cref="InvalidOperationException"/> if the provider is already linked.
+    /// </summary>
+    Task LinkExternalProviderAsync(
+        string userId,
+        string provider,
+        string providerKey,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes an external provider link from a user account.
+    /// Throws <see cref="InvalidOperationException"/> if the user has only one login method remaining
+    /// (password or external provider), to prevent locking them out.
+    /// </summary>
+    Task UnlinkExternalProviderAsync(
+        string userId,
+        string provider,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Creates a new user account and returns tokens for immediate login.
     /// Throws <see cref="InvalidOperationException"/> if registration fails (e.g. duplicate email).
     /// </summary>

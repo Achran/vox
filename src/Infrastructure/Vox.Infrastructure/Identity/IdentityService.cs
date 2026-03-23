@@ -187,6 +187,73 @@ public sealed class IdentityService : IIdentityService
         return BuildDto(appUser, authTokens);
     }
 
+    public async Task<IReadOnlyList<LinkedAccountDto>> GetLinkedProvidersAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        var appUser = await _userManager.FindByIdAsync(userId)
+            ?? throw new InvalidOperationException("User not found.");
+
+        var logins = await _userManager.GetLoginsAsync(appUser);
+
+        return logins
+            .Select(l => new LinkedAccountDto(l.LoginProvider, l.ProviderKey, l.ProviderDisplayName))
+            .ToList();
+    }
+
+    public async Task LinkExternalProviderAsync(
+        string userId,
+        string provider,
+        string providerKey,
+        CancellationToken cancellationToken = default)
+    {
+        var appUser = await _userManager.FindByIdAsync(userId)
+            ?? throw new InvalidOperationException("User not found.");
+
+        var result = await _userManager.AddLoginAsync(appUser,
+            new UserLoginInfo(provider, providerKey, provider));
+
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors.Select(e => e.Description).ToArray();
+            throw new InvalidOperationException(string.Join("; ", errors));
+        }
+    }
+
+    public async Task UnlinkExternalProviderAsync(
+        string userId,
+        string provider,
+        CancellationToken cancellationToken = default)
+    {
+        var appUser = await _userManager.FindByIdAsync(userId)
+            ?? throw new InvalidOperationException("User not found.");
+
+        var logins = await _userManager.GetLoginsAsync(appUser);
+        var hasPassword = await _userManager.HasPasswordAsync(appUser);
+
+        // Ensure at least one login method remains after removal
+        var totalMethods = logins.Count + (hasPassword ? 1 : 0);
+        if (totalMethods <= 1)
+        {
+            throw new InvalidOperationException("Cannot unlink the last login method.");
+        }
+
+        var login = logins.FirstOrDefault(l =>
+            l.LoginProvider.Equals(provider, StringComparison.OrdinalIgnoreCase));
+
+        if (login is null)
+        {
+            throw new InvalidOperationException($"Provider '{provider}' is not linked to this account.");
+        }
+
+        var result = await _userManager.RemoveLoginAsync(appUser, login.LoginProvider, login.ProviderKey);
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors.Select(e => e.Description).ToArray();
+            throw new InvalidOperationException(string.Join("; ", errors));
+        }
+    }
+
     private static string GenerateUniqueUserName(string provider, string providerKey)
     {
         // Produce a short deterministic username: provider_first8charsOfHash
