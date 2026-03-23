@@ -75,7 +75,7 @@ public sealed class LiveKitService : ILiveKitService
 
     public async Task DeleteRoomAsync(string roomName, CancellationToken cancellationToken = default)
     {
-        var token = GenerateServiceToken(roomCreate: true);
+        var token = GenerateServiceToken(roomAdmin: true);
         var request = CreateTwirpRequest("livekit.RoomService/DeleteRoom", token);
         request.Content = JsonContent.Create(new { room = roomName });
 
