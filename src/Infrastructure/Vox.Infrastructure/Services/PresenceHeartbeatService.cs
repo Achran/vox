@@ -51,6 +51,12 @@ public sealed class PresenceHeartbeatService : BackgroundService
 
         foreach (var connectionId in staleConnectionIds)
         {
+            // Re-check: the connection may have sent a heartbeat after the snapshot
+            if (!_presenceService.IsConnectionStale(connectionId, StaleTimeout))
+            {
+                continue;
+            }
+
             var userId = _presenceService.GetUserIdByConnectionId(connectionId);
             var channels = _presenceService.GetChannelsByConnectionId(connectionId);
 
@@ -63,9 +69,10 @@ public sealed class PresenceHeartbeatService : BackgroundService
                     userId,
                     connectionId);
 
-                if (!_presenceService.IsUserOnline(userId))
+                // Per-channel: notify if user no longer has presence in that channel
+                foreach (var channelId in channels)
                 {
-                    foreach (var channelId in channels)
+                    if (!_presenceService.IsUserInChannel(userId, channelId))
                     {
                         await _hubContext.Clients.Group(channelId)
                             .SendAsync("UserStatusChanged", userId, "Offline");

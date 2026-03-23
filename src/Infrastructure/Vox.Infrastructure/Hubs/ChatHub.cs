@@ -25,10 +25,17 @@ public class ChatHub : Hub
 
     public async Task JoinChannel(string channelId)
     {
+        var userId = Context.UserIdentifier;
+        var wasAlreadyInChannel = userId is not null && _presenceService.IsUserInChannel(userId, channelId);
+
         await Groups.AddToGroupAsync(Context.ConnectionId, channelId);
         await _presenceService.UserJoinedChannelAsync(Context.ConnectionId, channelId);
-        await Clients.Group(channelId).SendAsync("UserJoined", Context.UserIdentifier, channelId);
-        await Clients.Group(channelId).SendAsync("UserStatusChanged", Context.UserIdentifier, "Online");
+        await Clients.Group(channelId).SendAsync("UserJoined", userId, channelId);
+
+        if (!wasAlreadyInChannel)
+        {
+            await Clients.Group(channelId).SendAsync("UserStatusChanged", userId, "Online");
+        }
     }
 
     public async Task LeaveChannel(string channelId)
@@ -61,11 +68,15 @@ public class ChatHub : Hub
 
         await _presenceService.UserDisconnectedAsync(Context.ConnectionId);
 
-        if (userId is not null && !_presenceService.IsUserOnline(userId))
+        if (userId is not null)
         {
+            // Per-channel: notify if user no longer has presence in that channel
             foreach (var channelId in channels)
             {
-                await Clients.Group(channelId).SendAsync("UserStatusChanged", userId, "Offline");
+                if (!_presenceService.IsUserInChannel(userId, channelId))
+                {
+                    await Clients.Group(channelId).SendAsync("UserStatusChanged", userId, "Offline");
+                }
             }
         }
 

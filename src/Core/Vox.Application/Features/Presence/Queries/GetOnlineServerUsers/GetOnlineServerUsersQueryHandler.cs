@@ -21,14 +21,11 @@ public sealed class GetOnlineServerUsersQueryHandler
         GetOnlineServerUsersQuery request,
         CancellationToken cancellationToken)
     {
-        var server = await _unitOfWork.Servers.GetByIdAsync(request.ServerId, cancellationToken);
-        if (server is null)
-        {
-            return [];
-        }
+        var server = await _unitOfWork.Servers.GetByIdAsync(request.ServerId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Server with ID '{request.ServerId}' was not found.");
 
         var memberUserIds = server.Members.Select(m => m.UserId).ToList();
-        var onlineUserIds = _presenceService.GetOnlineUserIdsForServer(request.ServerId, memberUserIds);
+        var onlineUserIds = _presenceService.GetOnlineUserIdsForServer(memberUserIds);
 
         return onlineUserIds
             .Select(uid => new PresenceUserDto(uid, "Online"))

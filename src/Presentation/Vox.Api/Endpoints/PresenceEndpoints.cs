@@ -20,14 +20,28 @@ public static class PresenceEndpoints
     private static async Task<IResult> GetOnlineServerUsersAsync(
         Guid serverId, IMediator mediator, CancellationToken ct)
     {
-        var result = await mediator.Send(new GetOnlineServerUsersQuery(serverId), ct);
-        return Results.Ok(result);
+        try
+        {
+            var result = await mediator.Send(new GetOnlineServerUsersQuery(serverId), ct);
+            return Results.Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
     }
 
     private static async Task<IResult> GetOnlineChannelUsersAsync(
         Guid channelId, IMediator mediator, CancellationToken ct)
     {
-        var result = await mediator.Send(new GetOnlineChannelUsersQuery(channelId), ct);
-        return Results.Ok(result);
+        try
+        {
+            var result = await mediator.Send(new GetOnlineChannelUsersQuery(channelId), ct);
+            return Results.Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
     }
 }

@@ -12,7 +12,7 @@ public sealed class PresenceService : IPresenceService
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _connectionChannelMap = new();
 
     // connectionId -> last heartbeat timestamp (UTC)
-    private readonly ConcurrentDictionary<string, DateTime> _heartbeatMap = new();
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _heartbeatMap = new();
 
     // userId -> set of connectionIds (a user can have multiple connections)
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _userConnectionMap = new();
@@ -20,13 +20,22 @@ public sealed class PresenceService : IPresenceService
     // Per-user locks to ensure atomic connect/disconnect for the same user
     private readonly ConcurrentDictionary<string, object> _userLocks = new();
 
+    private readonly TimeProvider _timeProvider;
+
     private object GetUserLock(string userId) => _userLocks.GetOrAdd(userId, _ => new object());
+
+    public PresenceService() : this(TimeProvider.System) { }
+
+    public PresenceService(TimeProvider timeProvider)
+    {
+        _timeProvider = timeProvider;
+    }
 
     public Task UserConnectedAsync(string connectionId, string userId)
     {
         _connectionUserMap[connectionId] = userId;
         _connectionChannelMap[connectionId] = new ConcurrentDictionary<string, byte>();
-        _heartbeatMap[connectionId] = DateTime.UtcNow;
+        _heartbeatMap[connectionId] = _timeProvider.GetUtcNow();
 
         var userLock = GetUserLock(userId);
         lock (userLock)
@@ -90,12 +99,12 @@ public sealed class PresenceService : IPresenceService
 
     public Task HeartbeatAsync(string connectionId)
     {
-        _heartbeatMap.AddOrUpdate(connectionId, _ => DateTime.UtcNow, (_, _) => DateTime.UtcNow);
+        _heartbeatMap.AddOrUpdate(connectionId, _ => _timeProvider.GetUtcNow(), (_, _) => _timeProvider.GetUtcNow());
 
         return Task.CompletedTask;
     }
 
-    public IReadOnlyList<string> GetOnlineUserIdsForServer(Guid serverId, IReadOnlyList<Guid> memberUserIds)
+    public IReadOnlyList<string> GetOnlineUserIdsForServer(IReadOnlyList<Guid> memberUserIds)
     {
         var memberIdStrings = new HashSet<string>(memberUserIds.Select(id => id.ToString()));
 
@@ -123,12 +132,22 @@ public sealed class PresenceService : IPresenceService
 
     public IReadOnlyList<string> GetStaleConnectionIds(TimeSpan timeout)
     {
-        var cutoff = DateTime.UtcNow - timeout;
+        var cutoff = _timeProvider.GetUtcNow() - timeout;
 
         return _heartbeatMap
             .Where(kvp => kvp.Value < cutoff)
             .Select(kvp => kvp.Key)
             .ToList();
+    }
+
+    public bool IsConnectionStale(string connectionId, TimeSpan timeout)
+    {
+        if (!_heartbeatMap.TryGetValue(connectionId, out var lastHeartbeat))
+        {
+            return true;
+        }
+
+        return lastHeartbeat < _timeProvider.GetUtcNow() - timeout;
     }
 
     public string? GetUserIdByConnectionId(string connectionId)
@@ -150,5 +169,24 @@ public sealed class PresenceService : IPresenceService
     public bool IsUserOnline(string userId)
     {
         return _userConnectionMap.TryGetValue(userId, out var connections) && !connections.IsEmpty;
+    }
+
+    public bool IsUserInChannel(string userId, string channelId)
+    {
+        if (!_userConnectionMap.TryGetValue(userId, out var connectionIds))
+        {
+            return false;
+        }
+
+        foreach (var connectionId in connectionIds.Keys)
+        {
+            if (_connectionChannelMap.TryGetValue(connectionId, out var channels) &&
+                channels.ContainsKey(channelId))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

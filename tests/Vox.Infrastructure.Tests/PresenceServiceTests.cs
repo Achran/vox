@@ -1,10 +1,17 @@
+using Microsoft.Extensions.Time.Testing;
 using Vox.Infrastructure.Services;
 
 namespace Vox.Infrastructure.Tests;
 
 public class PresenceServiceTests
 {
-    private readonly PresenceService _sut = new();
+    private readonly FakeTimeProvider _timeProvider = new(DateTimeOffset.UtcNow);
+    private readonly PresenceService _sut;
+
+    public PresenceServiceTests()
+    {
+        _sut = new PresenceService(_timeProvider);
+    }
 
     [Fact]
     public async Task UserConnectedAsync_TracksUser()
@@ -109,7 +116,6 @@ public class PresenceServiceTests
 
         // Act
         var onlineUsers = _sut.GetOnlineUserIdsForServer(
-            Guid.NewGuid(),
             new List<Guid> { memberId1, memberId2 });
 
         // Assert
@@ -122,7 +128,7 @@ public class PresenceServiceTests
     {
         // Arrange
         await _sut.UserConnectedAsync("conn1", "user1");
-        await Task.Delay(50);
+        _timeProvider.Advance(TimeSpan.FromSeconds(5));
 
         // Act
         await _sut.HeartbeatAsync("conn1");
@@ -138,9 +144,9 @@ public class PresenceServiceTests
         // Arrange
         await _sut.UserConnectedAsync("conn1", "user1");
 
-        // Act - use very short timeout to simulate staleness
-        await Task.Delay(50);
-        var stale = _sut.GetStaleConnectionIds(TimeSpan.FromMilliseconds(10));
+        // Act - advance time past the timeout
+        _timeProvider.Advance(TimeSpan.FromSeconds(35));
+        var stale = _sut.GetStaleConnectionIds(TimeSpan.FromSeconds(30));
 
         // Assert
         Assert.Single(stale);
@@ -173,7 +179,6 @@ public class PresenceServiceTests
 
         // Assert - user is still online via second connection
         var onlineUsers = _sut.GetOnlineUserIdsForServer(
-            Guid.NewGuid(),
             new List<Guid> { userId });
         Assert.Single(onlineUsers);
 
@@ -182,7 +187,6 @@ public class PresenceServiceTests
 
         // Assert - user is now offline
         onlineUsers = _sut.GetOnlineUserIdsForServer(
-            Guid.NewGuid(),
             new List<Guid> { userId });
         Assert.Empty(onlineUsers);
     }
@@ -254,5 +258,89 @@ public class PresenceServiceTests
     {
         // Act & Assert
         Assert.False(_sut.IsUserOnline("unknown"));
+    }
+
+    [Fact]
+    public async Task IsUserInChannel_ReturnsTrue_WhenUserHasConnectionInChannel()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+        await _sut.UserJoinedChannelAsync("conn1", "channel1");
+
+        // Act & Assert
+        Assert.True(_sut.IsUserInChannel("user1", "channel1"));
+    }
+
+    [Fact]
+    public async Task IsUserInChannel_ReturnsFalse_AfterDisconnect()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+        await _sut.UserJoinedChannelAsync("conn1", "channel1");
+
+        // Act
+        await _sut.UserDisconnectedAsync("conn1");
+
+        // Assert
+        Assert.False(_sut.IsUserInChannel("user1", "channel1"));
+    }
+
+    [Fact]
+    public async Task IsUserInChannel_StillTrue_WhenOtherConnectionInChannel()
+    {
+        // Arrange - two connections in same channel
+        await _sut.UserConnectedAsync("conn1", "user1");
+        await _sut.UserConnectedAsync("conn2", "user1");
+        await _sut.UserJoinedChannelAsync("conn1", "channel1");
+        await _sut.UserJoinedChannelAsync("conn2", "channel1");
+
+        // Act - disconnect one
+        await _sut.UserDisconnectedAsync("conn1");
+
+        // Assert - user still in channel via conn2
+        Assert.True(_sut.IsUserInChannel("user1", "channel1"));
+    }
+
+    [Fact]
+    public async Task IsConnectionStale_ReturnsFalse_ForFreshConnection()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+
+        // Act & Assert
+        Assert.False(_sut.IsConnectionStale("conn1", TimeSpan.FromSeconds(30)));
+    }
+
+    [Fact]
+    public async Task IsConnectionStale_ReturnsTrue_AfterTimeout()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+
+        // Act - advance time past timeout
+        _timeProvider.Advance(TimeSpan.FromSeconds(35));
+
+        // Assert
+        Assert.True(_sut.IsConnectionStale("conn1", TimeSpan.FromSeconds(30)));
+    }
+
+    [Fact]
+    public async Task IsConnectionStale_ReturnsFalse_AfterHeartbeat()
+    {
+        // Arrange
+        await _sut.UserConnectedAsync("conn1", "user1");
+        _timeProvider.Advance(TimeSpan.FromSeconds(25));
+        await _sut.HeartbeatAsync("conn1");
+        _timeProvider.Advance(TimeSpan.FromSeconds(10));
+
+        // Act & Assert - only 10s since last heartbeat, not stale
+        Assert.False(_sut.IsConnectionStale("conn1", TimeSpan.FromSeconds(30)));
+    }
+
+    [Fact]
+    public void IsConnectionStale_ReturnsTrue_ForUnknownConnection()
+    {
+        // Act & Assert
+        Assert.True(_sut.IsConnectionStale("unknown", TimeSpan.FromSeconds(30)));
     }
 }
