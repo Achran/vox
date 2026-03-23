@@ -35,6 +35,9 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
                 ["JwtSettings:Audience"] = TestJwtHelper.Audience,
                 ["JwtSettings:ExpiryMinutes"] = "60",
                 ["JwtSettings:RefreshTokenExpiryDays"] = "7",
+                ["LiveKit:ApiKey"] = "test-api-key",
+                ["LiveKit:ApiSecret"] = "test-api-secret-at-least-32-characters-long!",
+                ["LiveKit:Url"] = "wss://test.livekit.cloud",
             });
         });
 
