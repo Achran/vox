@@ -44,12 +44,7 @@
             }
             else
             {
-                <div class="d-flex flex-column align-center justify-center pa-4" style="flex: 1;">
-                    <MudIcon Icon="@Icons.Material.Filled.VolumeUp" Size="Size.Large" Color="Color.Secondary" />
-                    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">
-                        Voice channel — connect to start talking.
-                    </MudText>
-                </div>
+                <VoiceChannel ChannelId="@_selectedChannel.Id" ChannelName="@_selectedChannel.Name" />
             }
         }
         else if (_selectedServer is not null)

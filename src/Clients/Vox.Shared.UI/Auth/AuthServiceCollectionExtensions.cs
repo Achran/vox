@@ -23,6 +23,7 @@ public static class AuthServiceCollectionExtensions
         services.AddScoped<IMessageService, MessageService>();
         services.AddScoped<IChatService, ChatService>();
         services.AddScoped<IPresenceService, PresenceService>();
+        services.AddScoped<IVoiceService, VoiceService>();
 
         return services;
     }
