@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.SignalR.Client;
 using Vox.Shared.UI.Auth;
@@ -9,10 +10,16 @@ public sealed class PresenceService : IPresenceService
     private readonly HttpClient _httpClient;
     private readonly ITokenStorageService _tokenStorage;
     private HubConnection? _hubConnection;
-    private readonly List<OnlineUserInfo> _onlineUsers = [];
+    private readonly object _lock = new();
+    private List<OnlineUserInfo> _onlineUsers = [];
+    private Guid? _serverId;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public IReadOnlyList<OnlineUserInfo> OnlineUsers => _onlineUsers;
+    public IReadOnlyList<OnlineUserInfo> OnlineUsers
+    {
+        get { lock (_lock) { return _onlineUsers.ToList(); } }
+    }
+
     public event Action? OnUsersChanged;
 
     public PresenceService(HttpClient httpClient, ITokenStorageService tokenStorage)
@@ -21,15 +28,17 @@ public sealed class PresenceService : IPresenceService
         _tokenStorage = tokenStorage;
     }
 
-    public async Task StartAsync()
+    public async Task StartAsync(Guid? serverId = null)
     {
         if (_hubConnection is not null)
             return;
 
+        _serverId = serverId;
+
         var baseUrl = _httpClient.BaseAddress?.ToString().TrimEnd('/') ?? "";
         var hubUrl = $"{baseUrl}/hubs/chat";
 
-        _hubConnection = new HubConnectionBuilder()
+        var connection = new HubConnectionBuilder()
             .WithUrl(hubUrl, options =>
             {
                 options.AccessTokenProvider = async () => await _tokenStorage.GetAccessTokenAsync();
@@ -37,47 +46,54 @@ public sealed class PresenceService : IPresenceService
             .WithAutomaticReconnect()
             .Build();
 
-        _hubConnection.On<JsonElement>("OnlineUsersList", users =>
-        {
-            _onlineUsers.Clear();
-            foreach (var user in users.EnumerateArray())
-            {
-                var info = user.Deserialize<OnlineUserInfo>(JsonOptions);
-                if (info is not null)
-                    _onlineUsers.Add(info);
-            }
-            OnUsersChanged?.Invoke();
-        });
-
-        _hubConnection.On<JsonElement>("UserOnline", user =>
+        connection.On<JsonElement>("UserOnline", user =>
         {
             var info = user.Deserialize<OnlineUserInfo>(JsonOptions);
-            if (info is not null && !_onlineUsers.Any(u => u.UserId == info.UserId))
+            if (info is not null)
             {
-                _onlineUsers.Add(info);
+                lock (_lock)
+                {
+                    if (!_onlineUsers.Any(u => u.UserId == info.UserId))
+                        _onlineUsers.Add(info);
+                }
                 OnUsersChanged?.Invoke();
             }
         });
 
-        _hubConnection.On<string>("UserOffline", userId =>
+        connection.On<string>("UserOffline", userId =>
         {
-            var removed = _onlineUsers.RemoveAll(u => u.UserId == userId);
-            if (removed > 0)
+            bool changed;
+            lock (_lock)
+            {
+                var before = _onlineUsers.Count;
+                _onlineUsers = _onlineUsers.Where(u => u.UserId != userId).ToList();
+                changed = _onlineUsers.Count != before;
+            }
+            if (changed)
                 OnUsersChanged?.Invoke();
         });
 
-        _hubConnection.Reconnected += async _ =>
+        connection.Reconnected += async _ =>
         {
-            await _hubConnection.InvokeAsync("GetOnlineUsers");
+            await FetchOnlineUsersAsync();
         };
 
-        await _hubConnection.StartAsync();
-        await _hubConnection.InvokeAsync("GetOnlineUsers");
+        try
+        {
+            await connection.StartAsync();
+            _hubConnection = connection;
+            await FetchOnlineUsersAsync();
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
     }
 
     public async Task StopAsync()
     {
-        _onlineUsers.Clear();
+        lock (_lock) { _onlineUsers = []; }
         OnUsersChanged?.Invoke();
 
         if (_hubConnection is not null)
@@ -92,4 +108,34 @@ public sealed class PresenceService : IPresenceService
     {
         await StopAsync();
     }
+
+    private async Task FetchOnlineUsersAsync()
+    {
+        if (_serverId is null) return;
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"api/servers/{_serverId}/online-users");
+            var accessToken = await _tokenStorage.GetAccessTokenAsync();
+            if (!string.IsNullOrEmpty(accessToken))
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+            using var response = await _httpClient.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                var dtos = await response.Content.ReadFromJsonAsync<List<PresenceUserDto>>(JsonOptions) ?? [];
+                lock (_lock)
+                {
+                    _onlineUsers = dtos.Select(d => new OnlineUserInfo(d.UserId, d.DisplayName ?? d.UserId)).ToList();
+                }
+                OnUsersChanged?.Invoke();
+            }
+        }
+        catch
+        {
+            // Silently ignore fetch failures; live events will still update the list
+        }
+    }
+
+    private sealed record PresenceUserDto(string UserId, string? DisplayName, string? Status);
 }

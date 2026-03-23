@@ -90,7 +90,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await PresenceService.StartAsync();
+        await PresenceService.StartAsync(ServerId);
     }
 
     protected override async Task OnParametersSetAsync()

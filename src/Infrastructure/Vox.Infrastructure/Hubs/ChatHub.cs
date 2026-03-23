@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using MediatR;
 using Microsoft.AspNetCore.SignalR;
+using Vox.Application.Abstractions;
 using Vox.Application.Features.Messages.Commands.SendMessage;
 
 namespace Vox.Infrastructure.Hubs;
@@ -8,12 +8,12 @@ namespace Vox.Infrastructure.Hubs;
 public class ChatHub : Hub
 {
     private readonly IMediator _mediator;
+    private readonly IPresenceService _presenceService;
 
-    private static readonly ConcurrentDictionary<string, OnlineUserEntry> _onlineUsers = new();
-
-    public ChatHub(IMediator mediator)
+    public ChatHub(IMediator mediator, IPresenceService presenceService)
     {
         _mediator = mediator;
+        _presenceService = presenceService;
     }
 
     public async Task SendMessage(string channelId, string message)
@@ -39,41 +39,47 @@ public class ChatHub : Hub
 
     public async Task JoinChannel(string channelId)
     {
-        var userId = GetDomainUserId();
+        var userId = Context.UserIdentifier;
+        var wasAlreadyInChannel = userId is not null && _presenceService.IsUserInChannel(userId, channelId);
+
         await Groups.AddToGroupAsync(Context.ConnectionId, channelId);
+        await _presenceService.UserJoinedChannelAsync(Context.ConnectionId, channelId);
         await Clients.Group(channelId).SendAsync("UserJoined", userId, channelId);
+
+        if (!wasAlreadyInChannel)
+        {
+            await Clients.Group(channelId).SendAsync("UserStatusChanged", userId, "Online");
+        }
     }
 
     public async Task LeaveChannel(string channelId)
     {
         var userId = GetDomainUserId();
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, channelId);
-        await Clients.Group(channelId).SendAsync("UserLeft", userId, channelId);
+        await _presenceService.UserLeftChannelAsync(Context.ConnectionId, channelId);
+        await Clients.Group(channelId).SendAsync("UserLeft", Context.UserIdentifier, channelId);
     }
 
-    public async Task GetOnlineUsers()
+    public async Task Heartbeat()
     {
-        var users = _onlineUsers.Values
-            .GroupBy(u => u.UserId)
-            .Select(g => g.First())
-            .Select(u => new { u.UserId, u.DisplayName })
-            .ToList();
-        await Clients.Caller.SendAsync("OnlineUsersList", users);
+        await _presenceService.HeartbeatAsync(Context.ConnectionId);
     }
 
     public override async Task OnConnectedAsync()
     {
-        var userId = TryGetDomainUserId();
+        var userId = Context.UserIdentifier;
         if (userId is not null)
         {
-            var displayName = Context.User?.FindFirst("display_name")?.Value
-                              ?? Context.User?.FindFirst("unique_name")?.Value
-                              ?? "User";
+            var isFirstConnection = !_presenceService.IsUserOnline(userId);
+            await _presenceService.UserConnectedAsync(Context.ConnectionId, userId);
 
-            var entry = new OnlineUserEntry(userId.Value.ToString(), displayName);
-            _onlineUsers[Context.ConnectionId] = entry;
-
-            await Clients.Others.SendAsync("UserOnline", new { entry.UserId, entry.DisplayName });
+            if (isFirstConnection)
+            {
+                var displayName = Context.User?.FindFirst("display_name")?.Value
+                                  ?? Context.User?.FindFirst("unique_name")?.Value
+                                  ?? "User";
+                await Clients.Others.SendAsync("UserOnline", new { UserId = userId, DisplayName = displayName });
+            }
         }
 
         await base.OnConnectedAsync();
@@ -81,12 +87,24 @@ public class ChatHub : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        if (_onlineUsers.TryRemove(Context.ConnectionId, out var entry))
+        var userId = Context.UserIdentifier;
+        var channels = _presenceService.GetChannelsByConnectionId(Context.ConnectionId);
+
+        await _presenceService.UserDisconnectedAsync(Context.ConnectionId);
+
+        if (userId is not null)
         {
-            var stillOnline = _onlineUsers.Values.Any(u => u.UserId == entry.UserId);
-            if (!stillOnline)
+            foreach (var channelId in channels)
             {
-                await Clients.Others.SendAsync("UserOffline", entry.UserId);
+                if (!_presenceService.IsUserInChannel(userId, channelId))
+                {
+                    await Clients.Group(channelId).SendAsync("UserStatusChanged", userId, "Offline");
+                }
+            }
+
+            if (!_presenceService.IsUserOnline(userId))
+            {
+                await Clients.Others.SendAsync("UserOffline", userId);
             }
         }
 
@@ -102,16 +120,4 @@ public class ChatHub : Hub
         }
         return userId;
     }
-
-    private Guid? TryGetDomainUserId()
-    {
-        var claim = Context.User?.FindFirst("domain_user_id")?.Value;
-        if (claim is not null && Guid.TryParse(claim, out var userId))
-        {
-            return userId;
-        }
-        return null;
-    }
-
-    private sealed record OnlineUserEntry(string UserId, string DisplayName);
 }

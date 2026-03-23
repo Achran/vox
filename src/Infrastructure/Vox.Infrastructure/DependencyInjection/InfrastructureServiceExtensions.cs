@@ -11,6 +11,7 @@ using Vox.Domain.Interfaces.Repositories;
 using Vox.Infrastructure.Identity;
 using Vox.Infrastructure.Persistence;
 using Vox.Infrastructure.Persistence.Repositories;
+using Vox.Infrastructure.Services;
 
 namespace Vox.Infrastructure.DependencyInjection;
 
@@ -102,6 +103,9 @@ public static class InfrastructureServiceExtensions
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IIdentityService, IdentityService>();
+
+        services.AddSingleton<IPresenceService, PresenceService>();
+        services.AddHostedService<PresenceHeartbeatService>();
 
         return services;
     }

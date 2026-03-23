@@ -4,6 +4,6 @@ public interface IPresenceService : IAsyncDisposable
 {
     IReadOnlyList<OnlineUserInfo> OnlineUsers { get; }
     event Action? OnUsersChanged;
-    Task StartAsync();
+    Task StartAsync(Guid? serverId = null);
     Task StopAsync();
 }

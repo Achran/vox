@@ -64,6 +64,7 @@ app.MapExternalAuthEndpoints();
 app.MapAccountLinkEndpoints();
 app.MapServerEndpoints();
 app.MapChannelEndpoints();
+app.MapPresenceEndpoints();
 app.MapMessageEndpoints();
 
 app.Run();
