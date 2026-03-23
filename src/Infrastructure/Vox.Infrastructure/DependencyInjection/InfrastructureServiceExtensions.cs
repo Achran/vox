@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -99,7 +100,10 @@ public static class InfrastructureServiceExtensions
 
         AddExternalProviders(authBuilder, externalSection);
 
-        services.AddSignalR();
+        services.AddSignalR(options =>
+        {
+            options.AddFilter<Hubs.ChatRateLimitFilter>();
+        });
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IIdentityService, IdentityService>();
