@@ -1,4 +1,4 @@
-@implements IDisposable
+@implements IAsyncDisposable
 @inject IVoiceService VoiceService
 @inject IPresenceService PresenceService
 @inject AuthenticationStateProvider AuthStateProvider
@@ -48,12 +48,17 @@
                 </MudTooltip>
             </div>
 
+            @{
+                var participants = VoiceService.Participants;
+                var onlineUsers = PresenceService.OnlineUsers;
+            }
+
             @* Participant list *@
             <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mb-2">
-                PARTICIPANTS — @VoiceService.Participants.Count
+                PARTICIPANTS — @participants.Count
             </MudText>
 
-            @if (VoiceService.Participants.Count == 0)
+            @if (participants.Count == 0)
             {
                 <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Class="pa-4">
                     Waiting for others to join…
@@ -61,20 +66,30 @@
             }
             else
             {
-                @foreach (var userId in VoiceService.Participants)
+                @foreach (var userId in participants)
                 {
-                    var displayName = GetDisplayName(userId);
-                    var isUnmuted = !IsMutedUser(userId);
+                    var displayName = GetDisplayName(userId, onlineUsers);
+                    var isLocalUser = userId == _currentUserId;
+                    var isLocalMuted = isLocalUser && VoiceService.IsMuted;
 
                     <div class="d-flex align-center gap-3 pa-2 rounded mb-1"
                          style="background-color: var(--mud-palette-background-gray);">
-                        @* Speaking indicator ring *@
+                        @* Avatar with speaking indicator for local user *@
                         <div style="position: relative;">
-                            <MudAvatar Size="Size.Medium"
-                                       Color="@(isUnmuted ? Color.Success : Color.Dark)"
-                                       Style="@(isUnmuted ? "box-shadow: 0 0 0 3px var(--mud-palette-success);" : "")">
-                                @GetInitials(displayName)
-                            </MudAvatar>
+                            @if (isLocalUser)
+                            {
+                                <MudAvatar Size="Size.Medium"
+                                           Color="@(isLocalMuted ? Color.Dark : Color.Success)"
+                                           Style="@(isLocalMuted ? "" : "box-shadow: 0 0 0 3px var(--mud-palette-success);")">
+                                    @GetInitials(displayName)
+                                </MudAvatar>
+                            }
+                            else
+                            {
+                                <MudAvatar Size="Size.Medium" Color="Color.Default">
+                                    @GetInitials(displayName)
+                                </MudAvatar>
+                            }
                         </div>
 
                         <div class="flex-grow-1" style="min-width: 0;">
@@ -82,24 +97,40 @@
                                 @displayName
                             </MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @(IsMutedUser(userId) ? "Muted" : "Connected")
+                                @if (isLocalMuted)
+                                {
+                                    @:Muted
+                                }
+                                else
+                                {
+                                    @:Connected
+                                }
                             </MudText>
                         </div>
 
-                        @* Volume level indicator *@
+                        @* Mic status indicator *@
                         <div class="d-flex align-center gap-1" style="min-width: 48px;">
-                            @if (isUnmuted)
+                            @if (isLocalUser)
                             {
-                                <MudIcon Icon="@Icons.Material.Filled.Mic"
-                                         Size="Size.Small"
-                                         Color="Color.Success" />
-                                <div style="width: 32px; height: 6px; border-radius: 3px; background-color: var(--mud-palette-lines-default); overflow: hidden;">
-                                    <div style="width: 60%; height: 100%; border-radius: 3px; background-color: var(--mud-palette-success); transition: width 0.15s ease;"></div>
-                                </div>
+                                @if (isLocalMuted)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.MicOff"
+                                             Size="Size.Small"
+                                             Color="Color.Error" />
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Mic"
+                                             Size="Size.Small"
+                                             Color="Color.Success" />
+                                    <div style="width: 32px; height: 6px; border-radius: 3px; background-color: var(--mud-palette-lines-default); overflow: hidden;">
+                                        <div style="width: 60%; height: 100%; border-radius: 3px; background-color: var(--mud-palette-success); transition: width 0.15s ease;"></div>
+                                    </div>
+                                }
                             }
                             else
                             {
-                                <MudIcon Icon="@Icons.Material.Filled.MicOff"
+                                <MudIcon Icon="@Icons.Material.Filled.Mic"
                                          Size="Size.Small"
                                          Color="Color.Secondary" />
                             }
@@ -205,14 +236,9 @@
         VoiceService.ToggleMute();
     }
 
-    private bool IsMutedUser(string userId)
+    private static string GetDisplayName(string userId, IReadOnlyList<OnlineUserInfo> onlineUsers)
     {
-        return userId == _currentUserId && VoiceService.IsMuted;
-    }
-
-    private string GetDisplayName(string userId)
-    {
-        var onlineUser = PresenceService.OnlineUsers.FirstOrDefault(u => u.UserId == userId);
+        var onlineUser = onlineUsers.FirstOrDefault(u => u.UserId == userId);
         return onlineUser?.DisplayName ?? userId;
     }
 
@@ -229,8 +255,20 @@
         InvokeAsync(StateHasChanged);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         VoiceService.StateChanged -= OnStateChanged;
+
+        if (_joined && _currentChannelId != Guid.Empty)
+        {
+            try
+            {
+                await VoiceService.LeaveChannelAsync(_currentChannelId.ToString());
+            }
+            catch
+            {
+                // Ignore errors during disposal
+            }
+        }
     }
 }

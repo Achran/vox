@@ -100,22 +100,32 @@ public sealed class VoiceService : IVoiceService
 
     public async Task JoinChannelAsync(string channelId)
     {
-        if (CurrentChannelId == channelId)
+        // If we're already connected and in the requested channel, nothing to do.
+        if (CurrentChannelId == channelId && IsConnected)
             return;
 
-        if (CurrentChannelId is not null)
+        // If we're in a different channel, leave it first.
+        if (CurrentChannelId is not null && CurrentChannelId != channelId)
         {
             await LeaveChannelAsync(CurrentChannelId);
         }
-
-        CurrentChannelId = channelId;
 
         if (!IsConnected)
         {
             await ConnectAsync();
         }
 
-        await _hubConnection!.InvokeAsync("JoinVoiceChannel", channelId);
+        try
+        {
+            await _hubConnection!.InvokeAsync("JoinVoiceChannel", channelId);
+            CurrentChannelId = channelId;
+        }
+        catch
+        {
+            // Ensure a failed join does not leave a stale CurrentChannelId
+            CurrentChannelId = null;
+            throw;
+        }
 
         StateChanged?.Invoke();
     }
