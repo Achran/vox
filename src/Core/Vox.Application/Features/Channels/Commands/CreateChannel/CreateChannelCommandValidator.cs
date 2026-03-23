@@ -10,7 +10,7 @@ public sealed class CreateChannelCommandValidator : AbstractValidator<CreateChan
             .NotEmpty().WithMessage("Server ID is required.");
 
         RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("Channel name is required.")
+            .Must(name => !string.IsNullOrWhiteSpace(name)).WithMessage("Channel name is required.")
             .MaximumLength(100).WithMessage("Channel name must not exceed 100 characters.");
 
         RuleFor(x => x.Type)
