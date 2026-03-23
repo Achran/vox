@@ -36,6 +36,8 @@ public static class VoiceEndpoints
         var roomName = $"voice-{channelId}";
         var token = liveKitService.GenerateToken(userId, displayName, roomName);
 
-        return Results.Ok(new { Token = token, Url = string.Empty });
+        var url = liveKitService.GetServerUrl();
+
+        return Results.Ok(new { Token = token, Url = url });
     }
 }

@@ -39,7 +39,6 @@ public sealed class LiveKitService : ILiveKitService
 
         var token = new JwtSecurityToken(
             issuer: _settings.ApiKey,
-            audience: null,
             claims: claims,
             notBefore: now,
             expires: now.AddHours(6),
@@ -47,4 +46,6 @@ public sealed class LiveKitService : ILiveKitService
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    public string GetServerUrl() => _settings.Url;
 }
