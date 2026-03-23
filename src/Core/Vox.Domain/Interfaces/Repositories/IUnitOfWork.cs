@@ -6,5 +6,6 @@ public interface IUnitOfWork
     IServerRepository Servers { get; }
     IChannelRepository Channels { get; }
     IServerMemberRepository ServerMembers { get; }
+    IMessageRepository Messages { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
