@@ -16,7 +16,7 @@ public sealed class SendMessageCommandHandler : IRequestHandler<SendMessageComma
 
     public async Task<MessageDto> Handle(SendMessageCommand request, CancellationToken cancellationToken)
     {
-        var channel = await _unitOfWork.Channels.GetByIdAsync(request.ChannelId, cancellationToken)
+        _ = await _unitOfWork.Channels.GetByIdAsync(request.ChannelId, cancellationToken)
             ?? throw new KeyNotFoundException($"Channel with ID '{request.ChannelId}' was not found.");
 
         var message = Message.Create(request.AuthorId, request.ChannelId, request.Content);
