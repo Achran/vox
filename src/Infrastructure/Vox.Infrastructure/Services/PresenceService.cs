@@ -17,25 +17,27 @@ public sealed class PresenceService : IPresenceService
     // userId -> set of connectionIds (a user can have multiple connections)
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _userConnectionMap = new();
 
+    // Per-user locks to ensure atomic connect/disconnect for the same user
+    private readonly ConcurrentDictionary<string, object> _userLocks = new();
+
+    private object GetUserLock(string userId) => _userLocks.GetOrAdd(userId, _ => new object());
+
     public Task UserConnectedAsync(string connectionId, string userId)
     {
         _connectionUserMap[connectionId] = userId;
         _connectionChannelMap[connectionId] = new ConcurrentDictionary<string, byte>();
         _heartbeatMap[connectionId] = DateTime.UtcNow;
 
-        _userConnectionMap.AddOrUpdate(
-            userId,
-            _ =>
+        var userLock = GetUserLock(userId);
+        lock (userLock)
+        {
+            if (!_userConnectionMap.TryGetValue(userId, out var connections))
             {
-                var set = new ConcurrentDictionary<string, byte>();
-                set.TryAdd(connectionId, 0);
-                return set;
-            },
-            (_, existing) =>
-            {
-                existing.TryAdd(connectionId, 0);
-                return existing;
-            });
+                connections = new ConcurrentDictionary<string, byte>();
+                _userConnectionMap[userId] = connections;
+            }
+            connections.TryAdd(connectionId, 0);
+        }
 
         return Task.CompletedTask;
     }
@@ -46,12 +48,20 @@ public sealed class PresenceService : IPresenceService
         _connectionChannelMap.TryRemove(connectionId, out _);
         _heartbeatMap.TryRemove(connectionId, out _);
 
-        if (userId is not null && _userConnectionMap.TryGetValue(userId, out var connections))
+        if (userId is not null)
         {
-            connections.TryRemove(connectionId, out _);
-            if (connections.IsEmpty)
+            var userLock = GetUserLock(userId);
+            lock (userLock)
             {
-                _userConnectionMap.TryRemove(userId, out _);
+                if (_userConnectionMap.TryGetValue(userId, out var connections))
+                {
+                    connections.TryRemove(connectionId, out _);
+                    if (connections.IsEmpty)
+                    {
+                        _userConnectionMap.TryRemove(userId, out _);
+                        _userLocks.TryRemove(userId, out _);
+                    }
+                }
             }
         }
 
