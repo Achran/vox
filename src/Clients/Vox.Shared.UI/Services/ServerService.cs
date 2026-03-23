@@ -33,7 +33,7 @@ public sealed class ServerService : IServerService
 
             if (!response.IsSuccessStatusCode)
             {
-                ErrorMessage = await ReadErrorAsync(response);
+                ErrorMessage = await ApiErrorHelper.ReadErrorAsync(response);
                 return [];
             }
 
@@ -56,7 +56,7 @@ public sealed class ServerService : IServerService
 
             if (!response.IsSuccessStatusCode)
             {
-                ErrorMessage = await ReadErrorAsync(response);
+                ErrorMessage = await ApiErrorHelper.ReadErrorAsync(response);
                 return null;
             }
 
@@ -80,7 +80,7 @@ public sealed class ServerService : IServerService
 
             if (!response.IsSuccessStatusCode)
             {
-                ErrorMessage = await ReadErrorAsync(response);
+                ErrorMessage = await ApiErrorHelper.ReadErrorAsync(response);
                 return null;
             }
 
@@ -104,7 +104,7 @@ public sealed class ServerService : IServerService
 
             if (!response.IsSuccessStatusCode)
             {
-                ErrorMessage = await ReadErrorAsync(response);
+                ErrorMessage = await ApiErrorHelper.ReadErrorAsync(response);
                 return null;
             }
 
@@ -127,7 +127,7 @@ public sealed class ServerService : IServerService
 
             if (!response.IsSuccessStatusCode)
             {
-                ErrorMessage = await ReadErrorAsync(response);
+                ErrorMessage = await ApiErrorHelper.ReadErrorAsync(response);
                 return false;
             }
 
@@ -148,19 +148,5 @@ public sealed class ServerService : IServerService
             request.Headers.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
         return request;
-    }
-
-    private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
-    {
-        try
-        {
-            using var doc = await JsonDocument.ParseAsync(
-                await response.Content.ReadAsStreamAsync());
-            if (doc.RootElement.TryGetProperty("error", out var errProp))
-                return errProp.GetString() ?? response.ReasonPhrase ?? "Unknown error";
-        }
-        catch { }
-
-        return response.ReasonPhrase ?? $"HTTP {(int)response.StatusCode}";
     }
 }

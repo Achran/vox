@@ -34,7 +34,7 @@ public sealed class ChannelService : IChannelService
 
             if (!response.IsSuccessStatusCode)
             {
-                ErrorMessage = await ReadErrorAsync(response);
+                ErrorMessage = await ApiErrorHelper.ReadErrorAsync(response);
                 return [];
             }
 
@@ -57,7 +57,7 @@ public sealed class ChannelService : IChannelService
 
             if (!response.IsSuccessStatusCode)
             {
-                ErrorMessage = await ReadErrorAsync(response);
+                ErrorMessage = await ApiErrorHelper.ReadErrorAsync(response);
                 return null;
             }
 
@@ -82,7 +82,7 @@ public sealed class ChannelService : IChannelService
 
             if (!response.IsSuccessStatusCode)
             {
-                ErrorMessage = await ReadErrorAsync(response);
+                ErrorMessage = await ApiErrorHelper.ReadErrorAsync(response);
                 return null;
             }
 
@@ -106,7 +106,7 @@ public sealed class ChannelService : IChannelService
 
             if (!response.IsSuccessStatusCode)
             {
-                ErrorMessage = await ReadErrorAsync(response);
+                ErrorMessage = await ApiErrorHelper.ReadErrorAsync(response);
                 return null;
             }
 
@@ -129,7 +129,7 @@ public sealed class ChannelService : IChannelService
 
             if (!response.IsSuccessStatusCode)
             {
-                ErrorMessage = await ReadErrorAsync(response);
+                ErrorMessage = await ApiErrorHelper.ReadErrorAsync(response);
                 return false;
             }
 
@@ -150,106 +150,5 @@ public sealed class ChannelService : IChannelService
             request.Headers.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
         return request;
-    }
-
-    private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
-    {
-        string? content = null;
-        try
-        {
-            content = await response.Content.ReadAsStringAsync();
-            if (string.IsNullOrWhiteSpace(content))
-                throw new JsonException("Empty content");
-
-            using var doc = JsonDocument.Parse(content);
-            var root = doc.RootElement;
-
-            if (root.TryGetProperty("error", out var errProp) && errProp.ValueKind == JsonValueKind.String)
-            {
-                var error = errProp.GetString();
-                if (!string.IsNullOrWhiteSpace(error))
-                    return error!;
-            }
-
-            if (root.TryGetProperty("errors", out var errorsProp))
-            {
-                var messages = new List<string>();
-
-                if (errorsProp.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var item in errorsProp.EnumerateArray())
-                    {
-                        if (item.ValueKind == JsonValueKind.String)
-                        {
-                            var msg = item.GetString();
-                            if (!string.IsNullOrWhiteSpace(msg))
-                                messages.Add(msg!);
-                        }
-                        else
-                        {
-                            var msg = item.ToString();
-                            if (!string.IsNullOrWhiteSpace(msg))
-                                messages.Add(msg);
-                        }
-                    }
-                }
-                else if (errorsProp.ValueKind == JsonValueKind.Object)
-                {
-                    foreach (var property in errorsProp.EnumerateObject())
-                    {
-                        var key = property.Name;
-                        var value = property.Value;
-                        var fieldMessages = new List<string>();
-
-                        if (value.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var v in value.EnumerateArray())
-                            {
-                                if (v.ValueKind == JsonValueKind.String)
-                                {
-                                    var msg = v.GetString();
-                                    if (!string.IsNullOrWhiteSpace(msg))
-                                        fieldMessages.Add(msg!);
-                                }
-                                else
-                                {
-                                    var msg = v.ToString();
-                                    if (!string.IsNullOrWhiteSpace(msg))
-                                        fieldMessages.Add(msg);
-                                }
-                            }
-                        }
-                        else if (value.ValueKind == JsonValueKind.String)
-                        {
-                            var msg = value.GetString();
-                            if (!string.IsNullOrWhiteSpace(msg))
-                                fieldMessages.Add(msg!);
-                        }
-                        else
-                        {
-                            var msg = value.ToString();
-                            if (!string.IsNullOrWhiteSpace(msg))
-                                fieldMessages.Add(msg);
-                        }
-
-                        if (fieldMessages.Count > 0)
-                        {
-                            messages.Add($"{key}: {string.Join(", ", fieldMessages)}");
-                        }
-                    }
-                }
-
-                if (messages.Count > 0)
-                    return string.Join("; ", messages);
-            }
-        }
-        catch
-        {
-            // Ignore parsing errors and fall back below.
-        }
-
-        if (!string.IsNullOrWhiteSpace(content))
-            return content!;
-        return response.ReasonPhrase ?? $"HTTP {(int)response.StatusCode}";
     }
 }

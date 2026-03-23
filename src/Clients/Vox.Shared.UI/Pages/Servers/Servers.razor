@@ -3,6 +3,7 @@
 @page "/servers/{ServerId:guid}/channels/{ChannelId:guid}"
 @attribute [Authorize]
 @inject IServerService ServerService
+@inject IChannelService ChannelService
 @inject NavigationManager Navigation
 
 <PageTitle>Servers - Vox</PageTitle>
@@ -87,13 +88,36 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (ServerId.HasValue && (_selectedServer is null || _selectedServer.Id != ServerId.Value))
+        if (!ServerId.HasValue)
+        {
+            _selectedServer = null;
+            _selectedChannel = null;
+            return;
+        }
+
+        if (_selectedServer is null || _selectedServer.Id != ServerId.Value)
         {
             var server = await ServerService.GetServerByIdAsync(ServerId.Value);
             if (server is not null)
             {
                 _selectedServer = server;
             }
+            else
+            {
+                _selectedServer = null;
+                _selectedChannel = null;
+                return;
+            }
+        }
+
+        if (!ChannelId.HasValue)
+        {
+            _selectedChannel = null;
+        }
+        else if (_selectedChannel is null || _selectedChannel.Id != ChannelId.Value)
+        {
+            var channel = await ChannelService.GetChannelByIdAsync(ChannelId.Value);
+            _selectedChannel = channel;
         }
     }
 

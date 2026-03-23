@@ -40,7 +40,7 @@
             }
             else
             {
-                if (TextChannels.Count > 0)
+                if (_textChannels.Count > 0)
                 {
                     <div class="pa-2">
                         <div class="d-flex align-center justify-space-between px-1 mb-1">
@@ -48,7 +48,7 @@
                             <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
                                            OnClick="OpenCreateTextChannelDialogAsync" />
                         </div>
-                        @foreach (var channel in TextChannels)
+                        @foreach (var channel in _textChannels)
                         {
                             <MudNavLink Style="@GetChannelStyle(channel)"
                                         OnClick="@(() => SelectChannel(channel))"
@@ -75,7 +75,7 @@
                     </div>
                 }
 
-                if (VoiceChannels.Count > 0)
+                if (_voiceChannels.Count > 0)
                 {
                     <div class="pa-2">
                         <div class="d-flex align-center justify-space-between px-1 mb-1">
@@ -83,7 +83,7 @@
                             <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
                                            OnClick="OpenCreateVoiceChannelDialogAsync" />
                         </div>
-                        @foreach (var channel in VoiceChannels)
+                        @foreach (var channel in _voiceChannels)
                         {
                             <MudNavLink Style="@GetChannelStyle(channel)"
                                         OnClick="@(() => SelectChannel(channel))"
@@ -159,14 +159,10 @@
     public EventCallback OnServerDeleted { get; set; }
 
     private List<ChannelResponse> _channels = [];
+    private List<ChannelResponse> _textChannels = [];
+    private List<ChannelResponse> _voiceChannels = [];
     private bool _loading;
     private Guid? _lastServerId;
-
-    private List<ChannelResponse> TextChannels =>
-        _channels.Where(c => c.Type.Equals(TextType, StringComparison.OrdinalIgnoreCase)).ToList();
-
-    private List<ChannelResponse> VoiceChannels =>
-        _channels.Where(c => c.Type.Equals(VoiceType, StringComparison.OrdinalIgnoreCase)).ToList();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -180,6 +176,8 @@
             else
             {
                 _channels = [];
+                _textChannels = [];
+                _voiceChannels = [];
             }
         }
     }
@@ -193,9 +191,16 @@
 
         var channels = await ChannelService.GetServerChannelsAsync(Server.Id);
         _channels = channels.ToList();
+        RebuildChannelGroups();
 
         _loading = false;
         StateHasChanged();
+    }
+
+    private void RebuildChannelGroups()
+    {
+        _textChannels = _channels.Where(c => c.Type.Equals(TextType, StringComparison.OrdinalIgnoreCase)).ToList();
+        _voiceChannels = _channels.Where(c => c.Type.Equals(VoiceType, StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
     private async Task SelectChannel(ChannelResponse channel)
