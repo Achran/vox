@@ -51,6 +51,8 @@
             @{
                 var participants = VoiceService.Participants;
                 var onlineUsers = PresenceService.OnlineUsers;
+                var activeSpeakers = VoiceService.ActiveSpeakers;
+                var muteStates = VoiceService.ParticipantMuteStates;
             }
 
             @* Participant list *@
@@ -70,26 +72,21 @@
                 {
                     var displayName = GetDisplayName(userId, onlineUsers);
                     var isLocalUser = userId == _currentUserId;
-                    var isLocalMuted = isLocalUser && VoiceService.IsMuted;
+                    var isSpeaking = activeSpeakers.Contains(userId);
+                    var isMuted = isLocalUser
+                        ? VoiceService.IsMuted
+                        : muteStates.TryGetValue(userId, out var remoteMuted) && remoteMuted;
 
                     <div class="d-flex align-center gap-3 pa-2 rounded mb-1"
-                         style="background-color: var(--mud-palette-background-gray);">
-                        @* Avatar with speaking indicator for local user *@
+                         style="background-color: var(--mud-palette-background-gray);
+                                @(isSpeaking && !isMuted ? "outline: 2px solid var(--mud-palette-success); outline-offset: -2px;" : "")">
+                        @* Avatar with speaking indicator *@
                         <div style="position: relative;">
-                            @if (isLocalUser)
-                            {
-                                <MudAvatar Size="Size.Medium"
-                                           Color="@(isLocalMuted ? Color.Dark : Color.Success)"
-                                           Style="@(isLocalMuted ? "" : "box-shadow: 0 0 0 3px var(--mud-palette-success);")">
-                                    @GetInitials(displayName)
-                                </MudAvatar>
-                            }
-                            else
-                            {
-                                <MudAvatar Size="Size.Medium" Color="Color.Default">
-                                    @GetInitials(displayName)
-                                </MudAvatar>
-                            }
+                            <MudAvatar Size="Size.Medium"
+                                       Color="@(isMuted ? Color.Dark : isSpeaking ? Color.Success : isLocalUser ? Color.Success : Color.Default)"
+                                       Style="@(isSpeaking && !isMuted ? "box-shadow: 0 0 0 3px var(--mud-palette-success);" : "")">
+                                @GetInitials(displayName)
+                            </MudAvatar>
                         </div>
 
                         <div class="flex-grow-1" style="min-width: 0;">
@@ -97,9 +94,13 @@
                                 @displayName
                             </MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @if (isLocalMuted)
+                                @if (isMuted)
                                 {
                                     @:Muted
+                                }
+                                else if (isSpeaking)
+                                {
+                                    @:Speaking
                                 }
                                 else
                                 {
@@ -110,29 +111,23 @@
 
                         @* Mic status indicator *@
                         <div class="d-flex align-center gap-1" style="min-width: 48px;">
-                            @if (isLocalUser)
+                            @if (isMuted)
                             {
-                                @if (isLocalMuted)
-                                {
-                                    <MudIcon Icon="@Icons.Material.Filled.MicOff"
-                                             Size="Size.Small"
-                                             Color="Color.Error" />
-                                }
-                                else
-                                {
-                                    <MudIcon Icon="@Icons.Material.Filled.Mic"
-                                             Size="Size.Small"
-                                             Color="Color.Success" />
-                                    <div style="width: 32px; height: 6px; border-radius: 3px; background-color: var(--mud-palette-lines-default); overflow: hidden;">
-                                        <div style="width: 60%; height: 100%; border-radius: 3px; background-color: var(--mud-palette-success); transition: width 0.15s ease;"></div>
-                                    </div>
-                                }
+                                <MudIcon Icon="@Icons.Material.Filled.MicOff"
+                                         Size="Size.Small"
+                                         Color="Color.Error" />
                             }
                             else
                             {
                                 <MudIcon Icon="@Icons.Material.Filled.Mic"
                                          Size="Size.Small"
-                                         Color="Color.Secondary" />
+                                         Color="@(isSpeaking ? Color.Success : Color.Secondary)" />
+                                @if (isSpeaking)
+                                {
+                                    <div style="width: 32px; height: 6px; border-radius: 3px; background-color: var(--mud-palette-lines-default); overflow: hidden;">
+                                        <div style="width: 80%; height: 100%; border-radius: 3px; background-color: var(--mud-palette-success); transition: width 0.15s ease;"></div>
+                                    </div>
+                                }
                             }
                         </div>
                     </div>
