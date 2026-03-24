@@ -9,8 +9,9 @@ let _dotNetRef = null;
  * @param {string} url   LiveKit server WebSocket URL
  * @param {string} token LiveKit access JWT
  * @param {object} dotNetRef DotNet object reference for callbacks
+ * @param {boolean} micEnabled Initial microphone state (true = unmuted)
  */
-export async function connect(url, token, dotNetRef) {
+export async function connect(url, token, dotNetRef, micEnabled) {
     _dotNetRef = dotNetRef;
 
     if (typeof LivekitClient === "undefined") {
@@ -65,7 +66,7 @@ export async function connect(url, token, dotNetRef) {
         });
 
         await _room.connect(url, token);
-        await _room.localParticipant.setMicrophoneEnabled(true);
+        await _room.localParticipant.setMicrophoneEnabled(!!micEnabled);
 
         return true;
     } catch (err) {

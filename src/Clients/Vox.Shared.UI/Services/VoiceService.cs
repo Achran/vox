@@ -222,8 +222,15 @@ public sealed class VoiceService : IVoiceService
 
             _dotNetRef ??= DotNetObjectReference.Create(this);
 
-            await module.InvokeAsync<bool>(
-                "connect", tokenResponse.Url, tokenResponse.Token, _dotNetRef);
+            var connected = await module.InvokeAsync<bool>(
+                "connect", tokenResponse.Url, tokenResponse.Token, _dotNetRef, !IsMuted);
+
+            if (connected)
+            {
+                // Ensure LiveKit mic state matches IsMuted and broadcast so remote UI stays consistent.
+                await SetMicrophoneEnabledAsync(!IsMuted);
+                await BroadcastMuteStateAsync();
+            }
         }
         catch
         {
