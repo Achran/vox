@@ -123,6 +123,10 @@ public sealed class VoiceService : IVoiceService
             if (CurrentChannelId is not null)
             {
                 await _hubConnection.InvokeAsync("JoinVoiceChannel", CurrentChannelId);
+
+                // Re-establish LiveKit audio after the SignalR channel rejoin so
+                // that actual media keeps working after a network interruption.
+                await ConnectLiveKitAsync(CurrentChannelId);
             }
         };
 

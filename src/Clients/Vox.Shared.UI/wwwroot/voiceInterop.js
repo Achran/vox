@@ -19,6 +19,12 @@ export async function connect(url, token, dotNetRef, micEnabled) {
         return false;
     }
 
+    // Disconnect any existing room before creating a new one (e.g. on reconnect)
+    if (_room) {
+        try { _room.disconnect(); } catch (_) { /* ignore */ }
+        _room = null;
+    }
+
     try {
         _room = new LivekitClient.Room({
             adaptiveStream: true,
